@@ -1,0 +1,72 @@
+# lab-metadata.yml
+# Single Point of Truth for Lab Information
+
+lab:
+  # Core lab information
+  name: "POC for single line catalog entry"
+  shortname: "zt-wilson-poc"
+  category: "poc"
+  tags: "rhel"
+  
+  # Detailed description for description.adoc generation
+  description:
+    summary: "POC for single line catalog entry"
+    goal: "POC for single line catalog entry"
+    concepts:
+      - "rhel"
+      - "poc"
+      - "catalog"
+    use_case: "POC for single line catalog entry"
+  
+  # Git references for deployment
+  git_ref:
+    production: "prod"
+    development: "dev"
+  
+  # Production settings
+  production:
+    enabled: "true"
+    maintainer: "Wilson Harris, wharris@redhat.com"
+
+# DYNAMIC EXTRACTION SOURCES:
+# ===========================
+# lab.version: git describe --tags --abbrev=0
+# repository.url: https://github.com/rhdps/{shortname}.git
+# repository.branch: git branch --show-current
+# configuration.instances[]: config/instances.yaml (per-instance extraction)
+# configuration.networks: config/networks.yaml
+# configuration.firewall: config/firewall.yaml
+# 
+# PER-INSTANCE EXTRACTION:
+# configuration.instances[].services: From each instance definition
+# configuration.instances[].routes: From each instance definition
+# 
+# GENERATED FILES:
+# description.adoc: Generated from lab.description (goal, concepts, use_case)
+# README.md: Generated from configuration extraction (instances, networks, firewall)
+# dev.yaml: Generated using git_ref.development
+# prod.yaml: Generated using git_ref.production
+
+# Example usage:
+# lab:
+#   name: "Red Hat OpenShift Networking Basics"
+#   shortname: "zt-networking-basics"
+#   category: "networking"
+#   tags: "openshift,networking,basics"
+#   
+#   description:
+#     summary: "Learn the fundamentals of networking in Red Hat OpenShift"
+#     goal: "Understand OpenShift networking concepts and configuration"
+#     concepts:
+#       - "OpenShift Services"
+#       - "Routes and Ingress"
+#       - "Network Policies"
+#     use_case: "Configure secure networking for containerized applications"
+#   
+#   git_ref:
+#     production: "prod"
+#     development: "dev"
+#   
+#   production:
+#     enabled: "true"
+#     maintainer: "Red Hat Learning Team"

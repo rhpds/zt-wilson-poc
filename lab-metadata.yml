@@ -1,18 +1,18 @@
 # lab-metadata.yml
 # Single Point of Truth for Lab Information
 
- lab:
-   name: "Red Hat Enterprise Linux Networking Basics"
-   shortname: "zt-networking-basics"
+lab:
+  name: "Red Hat Enterprise Linux Networking Basics"
+  shortname: "zt-networking-basics"
    
-   description:
-     summary: "Learn the fundamentals of networking in Red Hat Enterprise Linux"
-     goal: "Understand networking concepts and configuration in Red Hat Enterprise Linux"
-     concepts:
-       - "Networking"
-       - "Firewall"
-       - "Security"
-     use_case: "Configure secure networking for Red Hat Enterprise Linux"
+  description:
+    summary: "Learn the fundamentals of networking in Red Hat Enterprise Linux"
+    goal: "Understand networking concepts and configuration in Red Hat Enterprise Linux"
+    concepts:
+      - "Networking"
+      - "Firewall"
+      - "Security"
+    use_case: "Configure secure networking for Red Hat Enterprise Linux"
   
   # Git references for deployment
   git_ref:

@@ -1,20 +1,18 @@
 # lab-metadata.yml
 # Single Point of Truth for Lab Information
 
-lab:
-  # Core lab information
-  name: "POC for single line catalog entry"
-  shortname: "zt-wilson-poc"
-  
-  # Detailed description for description.adoc generation
-  description:
-    summary: "POC for single line catalog entry"
-    goal: "POC for single line catalog entry"
-    concepts:
-      - "rhel"
-      - "poc"
-      - "catalog"
-    use_case: "POC for single line catalog entry"
+ lab:
+   name: "Red Hat Enterprise Linux Networking Basics"
+   shortname: "zt-networking-basics"
+   
+   description:
+     summary: "Learn the fundamentals of networking in Red Hat Enterprise Linux"
+     goal: "Understand networking concepts and configuration in Red Hat Enterprise Linux"
+     concepts:
+       - "Networking"
+       - "Firewall"
+       - "Security"
+     use_case: "Configure secure networking for Red Hat Enterprise Linux"
   
   # Git references for deployment
   git_ref:

@@ -4,7 +4,8 @@
 lab:
   name: "Red Hat Enterprise Linux Networking Basics"
   shortname: "zt-networking-basics"
-   
+  maintainer: "Wilson Harris (wharris@redhat.com)" 
+  
   description:
     summary: "Learn the fundamentals of networking in Red Hat Enterprise Linux"
     goal: "Understand networking concepts and configuration in Red Hat Enterprise Linux"
@@ -13,13 +14,12 @@ lab:
       - "Firewall"
       - "Security"
     use_case: "Configure secure networking for Red Hat Enterprise Linux"
-  
+    time_to_complete: "10" # time in minutes
+    
   # Git references for deployment
   git_ref:
     production: "prod"
     development: "dev"
-  
-  maintainer: "Wilson Harris (wharris@redhat.com)"
 
 # DYNAMIC EXTRACTION SOURCES:
 # ===========================

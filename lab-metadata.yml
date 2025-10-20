@@ -14,12 +14,10 @@ lab:
       - "Firewall"
       - "Security"
     use_case: "Configure secure networking for Red Hat Enterprise Linux"
-    time_to_complete: "10" # time in minutes
+    time_to_complete: "10"
     
-  # Git references for deployment
   git_ref:
     production: "prod"
-    development: "dev"
 
 # DYNAMIC EXTRACTION SOURCES:
 # ===========================
@@ -27,25 +25,26 @@ lab:
 # GENERATED FILES:
 # description.adoc: Generated from lab.description (goal, concepts, use_case)
 # README.md: Generated from configuration extraction (maintainer, summary, instances, networks, firewall)
-# dev.yaml: Generated using git_ref.development
-# prod.yaml: Generated using git_ref.production
+# dev.yaml: Generated using git_ref.development (defaults to "main" if not specified)
+# prod.yaml: Generated using git_ref.production (required)
 #
 # Example usage:
 # lab:
-#   name: "Red Hat OpenShift Networking Basics"
-#   shortname: "zt-networking-basics"
-#   
+#   name: "Red Hat OpenShift Networking Basics"      # Full name of the lab that appears in the catalog
+#   shortname: "zt-ocp-networking-basics"            # Shortname for the lab (used for catalog entry)
+#   maintainer: "Wilson Harris (wharris@redhat.com)" # Lab maintainer / developer
+#
 #   description:
-#     summary: "Learn the fundamentals of networking in Red Hat OpenShift"
-#     goal: "Understand OpenShift networking concepts and configuration"
-#     concepts:
+#     summary: "Learn the fundamentals of networking in Red Hat OpenShift" # Short summary of the lab
+#     goal: "Understand OpenShift networking concepts and configuration"   # Longer description of the lab's goal
+#     concepts:                                                            # List of concepts covered in the lab
 #       - "OpenShift Services"
 #       - "Routes and Ingress"
 #       - "Network Policies"
-#     use_case: "Configure secure networking for containerized applications"
+#     use_case: "Configure networking for containerized applications"      # Use case for the lab
+#     time_to_complete: "10"                                               # time in minutes to complete the lab
 #   
 #   git_ref:
-#     production: "prod"
-#     development: "dev"
+#     production: "prod"    # Production git reference (required)
+#     # development: "dev"  # Optional: defaults to "main" if not specified
 #
-#   maintainer: "Wilson Harris (wharris@redhat.com)"

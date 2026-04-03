@@ -6,6 +6,10 @@ virtualmachines:
     memory: "2G"
     cores: 1
     image_size: "40G"
+    inputs:
+      - type: tablet
+        bus: usb
+        name: usb-tablet
     tags:
       - key: "AnsibleGroup"
         value: "bastions"

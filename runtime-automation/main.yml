@@ -45,8 +45,13 @@
 
   - name: Execute module_stage-host.sh if it exists
     when: r_script_test.stat.exists
-    shell: "sh -x /tmp/runtime-scripts/{{ module_dir }}/{{ module_stage }}-{{ ansible_host }}.sh > /tmp/runtime-scripts/{{ module_dir }}/{{ module_stage }}-{{ ansible_host }}.log 2>&1"
+    shell: "sh -x /tmp/runtime-scripts/..."
     become: true
+    environment:
+      GUID: "{{ lookup('ansible.builtin.env', 'GUID') | default('') }}"
+      DOMAIN: "{{ lookup('ansible.builtin.env', 'DOMAIN') | default('') }}"
+      LITELLM_API_URL: "{{ lookup('ansible.builtin.env', 'LITELLM_API_URL') | default('') }}"
+      LITELLM_API_KEY: "{{ lookup('ansible.builtin.env', 'LITELLM_API_KEY') | default('') }}"
     register: r_result
 
   - name: Output script result

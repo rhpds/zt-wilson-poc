@@ -1,19 +1,36 @@
 ---
 lab:
+  # Display name shown in the catalog
   name: "POC for Single Line Catalog Entry"
+
   description:
+    # One-line summary used in catalog description and zerotouch PR
     summary: "Proof of concept for streamlined catalog entry creation"
+
+    # Learning objective displayed in description.adoc
     goal: "Demonstrate automated catalog entry generation using lab-metadata.yml"
+
+    # Practical scenario for when this lab is useful
     use_case: "Simplify catalog management by using a single source of truth"
+
+    # Topics covered, rendered as a bullet list in description.adoc
     concepts:
       - "Catalog Automation"
       - "Metadata-Driven Configuration"
       - "GitHub Actions Workflows"
-    time_to_complete: "30 min"
+
+    # Estimated completion time in minutes (number only, workflow appends "min")
+    time_to_complete: 30
+
+  # Branch, tag, or release tag to deploy from (validated by the workflow)
   git_ref:
     production: "v0.0.1"
     development: "main"
+
+  # Ansible BU-specific parameters (optional, ignored by rhelbu templates)
   ansible:
     ironrdp_enable: false
     auth_cloud_provider: "none"
+
+  # Lab owner contact, shown in generated README
   maintainer: "Wilson Harris, wharris@redhat.com"

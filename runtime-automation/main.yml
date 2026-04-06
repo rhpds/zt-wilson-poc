@@ -14,6 +14,11 @@
   hosts: all:!localhost
   gather_facts: false
   become: false
+  vars:
+    _showroom_env_guid: "{{ lookup('ansible.builtin.env', 'GUID') | default('') }}"
+    _showroom_env_domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') | default('') }}"
+    _showroom_env_litellm_url: "{{ lookup('ansible.builtin.env', 'LITELLM_API_URL') | default('') }}"
+    _showroom_env_litellm_key: "{{ lookup('ansible.builtin.env', 'LITELLM_API_KEY') | default('') }}"
 
   tasks:
   - name: Simple debug task
@@ -45,13 +50,13 @@
 
   - name: Execute module_stage-host.sh if it exists
     when: r_script_test.stat.exists
-    shell: "sh -x /tmp/runtime-scripts/..."
+    shell: "sh -x /tmp/runtime-scripts/{{ module_dir }}/{{ module_stage }}-{{ ansible_host }}.sh > /tmp/runtime-scripts/{{ module_dir }}/{{ module_stage }}-{{ ansible_host }}.log 2>&1"
     become: true
     environment:
-      GUID: "{{ lookup('ansible.builtin.env', 'GUID') | default('') }}"
-      DOMAIN: "{{ lookup('ansible.builtin.env', 'DOMAIN') | default('') }}"
-      LITELLM_API_URL: "{{ lookup('ansible.builtin.env', 'LITELLM_API_URL') | default('') }}"
-      LITELLM_API_KEY: "{{ lookup('ansible.builtin.env', 'LITELLM_API_KEY') | default('') }}"
+      GUID: "{{ _showroom_env_guid }}"
+      DOMAIN: "{{ _showroom_env_domain }}"
+      LITELLM_API_URL: "{{ _showroom_env_litellm_url }}"
+      LITELLM_API_KEY: "{{ _showroom_env_litellm_key }}"
     register: r_result
 
   - name: Output script result

@@ -21,6 +21,10 @@ charts:
         auth:
           enabled: false  # No password for simplicity
 
+        # Disable NetworkPolicy creation (sandbox service account lacks RBAC permissions)
+        networkPolicy:
+          enabled: false
+
         master:
           persistence:
             enabled: true
@@ -64,6 +68,10 @@ charts:
         auth:
           postgresPassword: changeme  # Use common_password via catalog config
           database: testdb
+
+        # Disable NetworkPolicy creation (sandbox service account lacks RBAC permissions)
+        networkPolicy:
+          enabled: false
 
         primary:
           persistence:

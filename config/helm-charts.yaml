@@ -1,0 +1,87 @@
+---
+# Helm charts to deploy in this lab environment
+# This file is read by ocp4_workload_helm_from_content_repo
+
+charts:
+  # Simple Redis deployment for testing
+  - name: redis
+    enabled: true
+    source:
+      type: repository
+      url: https://charts.bitnami.com/bitnami
+      chart_ref: redis
+      version: "19.0.0"  # Pinned version for reproducibility
+
+    release:
+      name: test-redis
+      namespace: "{{ guid }}"  # Deploys to lab namespace
+      values:
+        # Redis configuration
+        architecture: standalone  # Single instance (not sentinel)
+        auth:
+          enabled: false  # No password for simplicity
+
+        master:
+          persistence:
+            enabled: true
+            size: 1Gi  # Small PVC for testing
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+    # Security constraints validated by workload
+    security:
+      allowClusterScopedResources: false
+      allowPrivileged: false
+      allowHostPath: false
+      maxCpuLimit: 1000m
+      maxMemoryLimit: 1Gi
+      maxStorageClaim: 2Gi
+
+    # Wait for pod readiness
+    wait:
+      enabled: true
+      timeout: 300
+
+  # PostgreSQL example (disabled by default)
+  - name: postgresql
+    enabled: false  # Set to true to test multiple charts
+    source:
+      type: repository
+      url: https://charts.bitnami.com/bitnami
+      chart_ref: postgresql
+      version: "15.0.0"
+
+    release:
+      name: test-db
+      namespace: "{{ guid }}"
+      values:
+        auth:
+          postgresPassword: "{{ common_password }}"
+          database: testdb
+
+        primary:
+          persistence:
+            size: 2Gi
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+    security:
+      allowClusterScopedResources: false
+      maxCpuLimit: 2000m
+      maxMemoryLimit: 2Gi
+
+    wait:
+      enabled: true
+      timeout: 600

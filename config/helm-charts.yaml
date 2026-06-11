@@ -16,6 +16,14 @@ charts:
       name: test-redis
       # namespace defaults to workload namespace (guid)
       values:
+        # OpenShift SCC compatibility
+        # Force adaptation because helm_template cannot auto-detect OpenShift
+        # See: https://github.com/bitnami/charts/blob/main/bitnami/redis/README.md
+        global:
+          compatibility:
+            openshift:
+              adaptSecurityContext: force  # Remove hardcoded UID/GID, let OpenShift assign
+
         # Redis configuration
         architecture: standalone  # Single instance (not sentinel)
         auth:
@@ -24,24 +32,6 @@ charts:
         # Disable NetworkPolicy creation (sandbox service account lacks RBAC permissions)
         networkPolicy:
           enabled: false
-
-        # OpenShift SCC compatibility - let platform assign UID/GID
-        podSecurityContext:
-          enabled: true
-          fsGroup: null           # Let OpenShift assign
-          runAsUser: null         # Let OpenShift assign
-          runAsNonRoot: true      # Still enforce non-root
-          seccompProfile:
-            type: RuntimeDefault
-
-        containerSecurityContext:
-          enabled: true
-          runAsUser: null         # Let OpenShift assign (will use namespace range)
-          runAsNonRoot: true
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false  # Redis needs writable /tmp
-          capabilities:
-            drop: ["ALL"]
 
         master:
           persistence:

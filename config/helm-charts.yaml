@@ -10,7 +10,7 @@ charts:
       type: repository
       url: https://charts.bitnami.com/bitnami
       chart_ref: redis
-      version: "19.0.0"  # Pinned version for reproducibility
+      version: "20.0.0"  # Updated to 20.0.0 for Redis 7.4
 
     release:
       name: test-redis
@@ -28,6 +28,10 @@ charts:
         architecture: standalone  # Single instance (not sentinel)
         auth:
           enabled: false  # No password for simplicity
+
+        # Override image to use latest tag (simpler than version pinning for testing)
+        image:
+          tag: latest
 
         # Disable NetworkPolicy creation (sandbox service account lacks RBAC permissions)
         networkPolicy:

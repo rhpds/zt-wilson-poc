@@ -29,8 +29,9 @@ spec:
           - redis-server
           - --bind
           - "127.0.0.1"  # Bind to localhost only (single-pod networking)
-          - --appendonly
-          - "yes"
+          - --save
+          - ""  # Disable RDB persistence
+          # AOF disabled to avoid permission issues with OpenShift random UIDs
 
       # Container 2: Redis Commander web UI (connects to localhost:6379)
       - name: commander

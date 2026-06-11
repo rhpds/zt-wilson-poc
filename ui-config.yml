@@ -15,7 +15,7 @@ antora:
 
 tabs:
   - name: "Redis Commander"
-    url: https://multi-test-{guid}.{domain}
+    url: https://multi-test-${guid}.${domain}/
   - name: "Asciidoc Doc"
     url: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
     external: true

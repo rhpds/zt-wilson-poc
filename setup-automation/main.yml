@@ -1,99 +1,34 @@
 ---
-- name: Create inventory
+# Minimal setup playbook for helm-only testing
+# No VMs/bastions required - helm charts deployed via ocp4_workload_helm_from_content_repo
+
+- name: Helm-only setup (no VM required)
   hosts: localhost
-  gather_facts: false
-  tasks:
-  - name: Add bastion host
-    ansible.builtin.add_host:
-      name: "{{ lookup('ansible.builtin.env', 'BASTION_HOST') }}"
-      ansible_ssh_host: "{{ lookup('ansible.builtin.env', 'BASTION_HOST') }}"
-      ansible_ssh_port: "{{ lookup('ansible.builtin.env', 'BASTION_PORT') }}"
-      ansible_ssh_user: "{{ lookup('ansible.builtin.env', 'BASTION_USER') }}"
-      ansible_ssh_pass: "{{ lookup('ansible.builtin.env', 'BASTION_PASSWORD') }}"
-- name: Demo Playbook for the ansible-runner API
-  hosts: all:!localhost
   gather_facts: false
   vars:
     _showroom_env_guid: "{{ lookup('ansible.builtin.env', 'GUID') | default('') }}"
     _showroom_env_domain: "{{ lookup('ansible.builtin.env', 'DOMAIN') | default('') }}"
-    _showroom_env_litellm_url: "{{ lookup('ansible.builtin.env', 'LITELLM_API_URL') | default('') }}"
-    _showroom_env_litellm_key: "{{ lookup('ansible.builtin.env', 'LITELLM_API_KEY') | default('') }}"
   tasks:
 
-  - ansible.builtin.wait_for_connection:
+  - name: Log environment variables
+    ansible.builtin.debug:
+      msg: |
+        Setup automation running (helm-only mode)
+        GUID: {{ _showroom_env_guid }}
+        DOMAIN: {{ _showroom_env_domain }}
 
-  - name: Write environment variables to file for verification
+        Helm charts deployed via ocp4_workload_helm_from_content_repo
+        Access routes via Showroom UI or:
+        oc get routes -n {{ _showroom_env_guid }}
+
+  - name: Create marker file
     ansible.builtin.copy:
       content: |
+        Setup completed at {{ ansible_date_time.iso8601 }}
         GUID={{ _showroom_env_guid }}
         DOMAIN={{ _showroom_env_domain }}
-        LITELLM_API_URL={{ _showroom_env_litellm_url }}
-        LITELLM_API_KEY={{ _showroom_env_litellm_key }}
-      dest: /home/rhel/setup-env-check.txt
-      owner: rhel
-      group: rhel
+
+        This lab uses helm charts deployed via ocp4_workload_helm_from_content_repo.
+        No VMs or containers from instances.yaml.
+      dest: /tmp/helm-setup-complete.txt
       mode: '0644'
-    become: true
-
-  - name: Simple debug task
-    ansible.builtin.debug:
-      msg: "Hello Runner"
-
-  - name: Set config_host variable with ansible_host value
-    set_fact:
-      config_host: "{{ ansible_host }}"
-
-  - name: Create a directory if it does not exist
-    ansible.builtin.file:
-      path: "/tmp/setup-scripts/"
-      state: directory
-      mode: '0755'
-
-  - name: Check if setup-server.sh exists
-    ansible.builtin.stat:
-      path: "./setup-{{ config_host }}.sh"
-    delegate_to: localhost
-    register: r_script_test
-
-  - name: Copy script file
-    when: r_script_test.stat.exists
-    copy:
-      src: "./setup-{{ ansible_host }}.sh"
-      dest: "/tmp/setup-scripts/setup-{{ ansible_host }}.sh"
-    register: r_result
-
-  - name: Execute module_stage-host.sh if it exists
-    when: r_script_test.stat.exists
-    shell: "sh -x /tmp/setup-scripts/setup-{{ ansible_host }}.sh > /tmp/setup-scripts/setup-{{ ansible_host }}.log 2>&1"
-    become: true
-    environment:
-      GUID: "{{ _showroom_env_guid }}"
-      DOMAIN: "{{ _showroom_env_domain }}"
-      LITELLM_API_URL: "{{ _showroom_env_litellm_url }}"
-      LITELLM_API_KEY: "{{ _showroom_env_litellm_key }}"
-    register: r_result
-
-  - name: Output script result
-    ansible.builtin.debug:
-      var: r_result.stdout
-    when: r_script_test.stat.exists
-
-  - name: Write script result to file
-    ansible.builtin.copy:
-      content: "{{ r_result.stdout | default(r_result.stderr) | default(r_result) }}"
-      dest: "/tmp/{{ ansible_host }}-setup-script.out"
-    delegate_to: localhost
-    when:
-    - r_result is defined
-
-  - name: Output script result
-    ansible.builtin.debug:
-      var: r_result
-    when: r_result is defined
-
-  - name: Fail if stage was failed
-    ansible.builtin.fail:
-      msg: "Setup failed"
-    when:
-    - r_result is defined
-    - r_result.rc != 0

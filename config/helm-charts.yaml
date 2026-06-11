@@ -66,7 +66,7 @@ charts:
 
   # PostgreSQL example (disabled by default)
   - name: postgresql
-    enabled: false  # Set to true to test multiple charts
+    enabled: true  # Enabled for testing
     source:
       type: repository
       url: https://charts.bitnami.com/bitnami
@@ -77,9 +77,19 @@ charts:
       name: test-db
       # namespace defaults to workload namespace (guid)
       values:
+        # OpenShift SCC compatibility (same as Redis)
+        global:
+          compatibility:
+            openshift:
+              adaptSecurityContext: force
+
         auth:
           postgresPassword: changeme  # Use common_password via catalog config
           database: testdb
+
+        # Override image to use latest tag (simpler than version pinning for testing)
+        image:
+          tag: latest
 
         # Disable NetworkPolicy creation (sandbox service account lacks RBAC permissions)
         networkPolicy:

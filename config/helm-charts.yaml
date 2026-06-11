@@ -74,9 +74,41 @@ charts:
         tls_termination: edge
         remove_x_frame_options: true  # Allow iframe embedding
 
-  # PostgreSQL example (disabled by default)
+  # Multi-container pod test - localhost communication
+  - name: multi-container-test
+    enabled: true
+    source:
+      type: path
+      path: /showroom/repo/helm-chart  # Local chart in content repo
+
+    release:
+      name: multi-test
+      # namespace defaults to workload namespace (guid)
+      values:
+        replicaCount: 1
+
+    security:
+      allowClusterScopedResources: false
+      maxCpuLimit: 500m
+      maxMemoryLimit: 512Mi
+
+    wait:
+      enabled: true
+      timeout: 180
+
+    # Route for Showroom iframe access
+    routes:
+      - name: multi-test
+        service: multi-test-multi-container
+        host: multi-test
+        targetPort: http
+        tls: true
+        tls_termination: edge
+        remove_x_frame_options: true  # Allow iframe embedding
+
+  # PostgreSQL example (disabled for multi-container testing)
   - name: postgresql
-    enabled: true  # Enabled for testing
+    enabled: false
     source:
       type: repository
       url: https://charts.bitnami.com/bitnami

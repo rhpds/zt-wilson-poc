@@ -25,6 +25,24 @@ charts:
         networkPolicy:
           enabled: false
 
+        # OpenShift SCC compatibility - let platform assign UID/GID
+        podSecurityContext:
+          enabled: true
+          fsGroup: null           # Let OpenShift assign
+          runAsUser: null         # Let OpenShift assign
+          runAsNonRoot: true      # Still enforce non-root
+          seccompProfile:
+            type: RuntimeDefault
+
+        containerSecurityContext:
+          enabled: true
+          runAsUser: null         # Let OpenShift assign (will use namespace range)
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false  # Redis needs writable /tmp
+          capabilities:
+            drop: ["ALL"]
+
         master:
           persistence:
             enabled: true

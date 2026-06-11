@@ -24,7 +24,7 @@
   - name: Create marker file
     ansible.builtin.copy:
       content: |
-        Setup completed at {{ ansible_date_time.iso8601 }}
+        Helm-only setup completed
         GUID={{ _showroom_env_guid }}
         DOMAIN={{ _showroom_env_domain }}
 

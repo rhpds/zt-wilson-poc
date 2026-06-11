@@ -1,32 +1,4 @@
 ---
+# Helm-only testing configuration - no VMs or containers needed
+virtualmachines: []
 containers: []
-virtualmachines:
-  - name: "host1"
-    image: "rhel-10-0-07-09-25-3"
-    bootloader: efi
-    memory: "8G"
-    cores: 1
-    image_size: "40G"
-    inputs:
-      - type: tablet
-        bus: usb
-        name: usb-tablet
-    tags:
-      - key: "AnsibleGroup"
-        value: "bastions"
-    networks:
-      - default
-    services:
-      - name: builder-http
-        ports:
-          - port: 80
-            protocol: TCP
-            targetPort: 80
-            name: builder-http
-
-    routes:
-      - name: builder-http
-        host: builder
-        service: builder-http
-        targetPort: 80
-        tls: false

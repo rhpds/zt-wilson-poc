@@ -127,11 +127,4 @@ charts:
       timeout: 600
 
     # Routes for external access (optional)
-    # Note: Databases typically don't need Routes, this is just for testing
-    routes:
-      - name: postgresql
-        service: test-db-postgresql
-        host: postgresql
-        targetPort: 5432
-        tls: true
-        tls_termination: passthrough  # No TLS termination for database protocol
+    # Note: Databases typically don't need Routes - access via Service DNS from other pods

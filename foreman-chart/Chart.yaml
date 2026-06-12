@@ -1,0 +1,15 @@
+apiVersion: v2
+name: foreman
+description: Foreman lifecycle management platform deployed on OpenShift
+type: application
+version: 1.0.0
+appVersion: "3.13"
+keywords:
+  - foreman
+  - lifecycle-management
+  - provisioning
+sources:
+  - https://github.com/theforeman/foreman
+  - https://github.com/rhpds/zt-wilson-poc
+maintainers:
+  - name: RHDP Zerotouch Team

@@ -1,6 +1,71 @@
 ---
-# By default egress traffic is not allowed, define below the ports allowed.
+# NetworkPolicy configuration for Foreman deployment
+# Defines allowed ingress (incoming) and egress (outgoing) traffic
+
+# Ingress: Allow incoming connections to Foreman services
+ingress:
+  # Allow HTTP/HTTPS traffic from anywhere (for Foreman web UI access)
+  - from:
+      - ipBlock:
+          cidr: 0.0.0.0/0
+    ports:
+      - protocol: TCP
+        port: 80
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 3000  # Foreman Rails server
+      - protocol: TCP
+        port: 8080
+
+  # Allow database connections within namespace (Foreman pods → PostgreSQL/Redis)
+  - from:
+      - podSelector: {}  # Any pod in this namespace
+    ports:
+      - protocol: TCP
+        port: 5432  # PostgreSQL
+      - protocol: TCP
+        port: 6379  # Redis
+
+  # Allow VNC connections for console access (if enabled)
+  - from:
+      - ipBlock:
+          cidr: 0.0.0.0/0
+    ports:
+      - protocol: TCP
+        port: 5910
+      - protocol: TCP
+        port: 5930
+
+# Egress: Allow outgoing connections from pods
 egress:
+  # DNS for service discovery
+  - to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-dns
+    ports:
+      - protocol: UDP
+        port: 5353
+      - protocol: TCP
+        port: 5353
+
+  # PostgreSQL database connections within namespace
+  - ports:
+      - protocol: TCP
+        port: 5432
+
+  # Redis connections within namespace
+  - ports:
+      - protocol: TCP
+        port: 6379
+
+  # HTTPS for external connections (package downloads, etc.)
   - ports:
       - protocol: TCP
         port: 443
+
+  # HTTP for external connections (if needed)
+  - ports:
+      - protocol: TCP
+        port: 80

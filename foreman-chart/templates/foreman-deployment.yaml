@@ -15,7 +15,7 @@ spec:
     targetPort: http
     protocol: TCP
   {{- if .Values.vnc.enabled }}
-  {{- range $port := untilStep (int .Values.vnc.startPort) (int (add1 .Values.vnc.endPort)) 1 }}
+  {{- range $port := untilStep (int .Values.vnc.startPort) (int (add .Values.vnc.endPort 1)) 1 }}
   - name: vnc-{{ $port }}
     port: {{ $port }}
     targetPort: {{ $port }}
@@ -120,7 +120,7 @@ spec:
           containerPort: 3000
           protocol: TCP
         {{- if .Values.vnc.enabled }}
-        {{- range $port := untilStep (int .Values.vnc.startPort) (int (add1 .Values.vnc.endPort)) 1 }}
+        {{- range $port := untilStep (int .Values.vnc.startPort) (int (add .Values.vnc.endPort 1)) 1 }}
         - containerPort: {{ $port }}
           protocol: TCP
         {{- end }}

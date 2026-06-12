@@ -16,8 +16,6 @@ antora:
 tabs:
   - name: "Foreman Web UI"
     url: https://foreman-${guid}.${domain}/
-  - name: "Terminal"
-    type: terminal
   - name: "Asciidoc Doc"
     url: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
     external: true

@@ -22,46 +22,24 @@ containers:
       - /bin/bash
       - -c
       - |
-        # Configure hammer CLI on container startup
-        mkdir -p /root/.hammer/cli.modules.d/
-        cat > /root/.hammer/cli.modules.d/foreman.yml <<EOF
+        mkdir -p /root/.hammer/cli.modules.d
+        cat > /root/.hammer/cli.modules.d/foreman.yml << HAMMEREOF
         :foreman:
           :enable_module: true
-          :host: '${FOREMAN_HOST}'
-          :username: '${FOREMAN_USERNAME}'
-          :password: '${FOREMAN_PASSWORD}'
+          :host: ${FOREMAN_HOST}
+          :username: ${FOREMAN_USERNAME}
+          :password: ${FOREMAN_PASSWORD}
           :verify_ssl: false
           :request_timeout: 120
-        EOF
-
-        # Create custom bashrc for terminal
-        cat > /root/.foreman_bashrc <<'EOF'
+        HAMMEREOF
+        cat > /root/.foreman_bashrc << BASHEOF
         [ -f /etc/bashrc ] && . /etc/bashrc
         [ -f ~/.bashrc ] && . ~/.bashrc
-        echo "==========================================="
-        echo "  Foreman CLI - Hammer Tool"
-        echo "==========================================="
-        echo ""
-        echo "Foreman URL: ${FOREMAN_HOST}"
-        echo "Username: ${FOREMAN_USERNAME}"
-        echo "Password: ${FOREMAN_PASSWORD}"
-        echo ""
-        echo "Testing connection to Foreman..."
-        if timeout 5 hammer ping &>/dev/null; then
-          echo "Connected to Foreman API successfully"
-          hammer --version
-        else
-          echo "Foreman API not ready yet (may still be initializing)"
-          echo "Run hammer ping to test connectivity"
-        fi
-        echo ""
-        echo "Common commands:"
-        echo "  hammer ping                 - Test API connectivity"
-        echo "  hammer organization list    - List organizations"
-        echo "  hammer host list            - List hosts"
-        echo "  hammer --help               - Show all commands"
-        echo "==========================================="
-        echo ""
-        EOF
-
+        echo "Foreman CLI - Hammer Tool"
+        echo "URL: ${FOREMAN_HOST}"
+        echo "User: ${FOREMAN_USERNAME}"
+        echo "Pass: ${FOREMAN_PASSWORD}"
+        if timeout 5 hammer ping >/dev/null 2>&1; then echo "Connected"; hammer --version; else echo "API not ready - run hammer ping"; fi
+        echo "Commands: hammer ping | hammer host list | hammer --help"
+        BASHEOF
         exec sleep infinity

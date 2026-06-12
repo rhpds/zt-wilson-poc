@@ -30,11 +30,12 @@ foreman:
   # Domain defaults to apps domain from cluster
 
   # Resource limits (per container)
+  # Total requests meet Foreman minimum: 4 cores / 4 GB
   app:
     resources:
       requests:
-        cpu: 500m
-        memory: 1Gi
+        cpu: 1500m      # Primary Rails app needs most CPU
+        memory: 2Gi     # Primary memory consumer
       limits:
         cpu: 2000m
         memory: 4Gi
@@ -43,7 +44,7 @@ foreman:
     concurrency: 1  # Single-threaded coordinator
     resources:
       requests:
-        cpu: 250m
+        cpu: 500m       # Background orchestration
         memory: 512Mi
       limits:
         cpu: 1000m
@@ -53,7 +54,7 @@ foreman:
     concurrency: 15  # Multi-threaded worker
     resources:
       requests:
-        cpu: 250m
+        cpu: 500m       # Background job processing
         memory: 512Mi
       limits:
         cpu: 1000m
@@ -70,33 +71,35 @@ postgresql:
 
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
+      cpu: 1000m      # PostgreSQL is CPU-intensive
+      memory: 1Gi     # Database working set
     limits:
-      cpu: 1000m
+      cpu: 2000m
       memory: 2Gi
 
 # Redis configuration
 redis:
   cache:
     # Port 6379, in-memory only (no persistence)
+    # Rails cache - benefits from more CPU for cache operations
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
+        cpu: 200m
+        memory: 256Mi
       limits:
         cpu: 500m
         memory: 512Mi
 
   tasks:
     # Port 6379, persistent queue with AOF
+    # Sidekiq/Dynflow queue - benefits from more CPU for queue processing
     storage: 2Gi
     storageClass: ""  # Empty uses default storage class
 
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
+        cpu: 200m
+        memory: 256Mi
       limits:
         cpu: 500m
         memory: 512Mi

@@ -3,12 +3,13 @@
 virtualmachines: []
 containers:
   - name: foreman-tools
-    image: quay.io/foreman/foreman-toolbox:latest
+    image: quay.io/foreman/foreman:3.13-stable
     environment: {}
     command:
       - /bin/sh
       - -c
       - sleep infinity
+    args: []
     ports:
       - containerPort: 8080
         protocol: TCP

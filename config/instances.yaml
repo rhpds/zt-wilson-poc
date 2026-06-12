@@ -10,7 +10,8 @@ containers:
       - -c
       - sleep infinity
     ports:
-      - 8080
+      - containerPort: 8080
+        protocol: TCP
     terminals:
       - name: foreman-cli
         command: /bin/bash

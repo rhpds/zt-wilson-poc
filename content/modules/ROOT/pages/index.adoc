@@ -1,0 +1,916 @@
+= Deploying Foreman on OpenShift with Helm
+:toc:
+:toc-placement: auto
+:source-highlighter: rouge
+
+Learn how to deploy Foreman 3.13 on OpenShift using custom Helm charts integrated with the RHDP Zerotouch platform. This guide demonstrates the architecture decisions, Helm chart integration patterns, and AgnosticD workload configuration for deploying lifecycle management infrastructure in lab environments.
+
+== Learning Objectives
+
+By the end of this guide, you will understand:
+
+* Foreman's multi-tier Kubernetes architecture and deployment patterns
+* How to add custom Helm charts to Showroom lab content repositories
+* NetworkPolicy configuration for pod-to-pod communication in lab environments
+* AgnosticD's `ocp4_workload_helm_from_content_repo` deployment workflow
+
+== Why Foreman on OpenShift?
+
+Foreman is an open-source lifecycle management platform for physical and virtual systems. It provides:
+
+* Provisioning orchestration for bare metal, virtualization, and cloud platforms
+* Configuration management integration (Ansible, Puppet, Salt)
+* Content management via Katello for RPM/DEB packages
+* Inventory and reporting for infrastructure assets
+
+Running Foreman on OpenShift enables:
+
+* *Lab isolation*: Each RHDP deployment gets its own Foreman instance with predictable lifecycle
+* *Resource efficiency*: Container-based deployment reduces overhead compared to full VM appliances
+* *GitOps integration*: Helm charts in content repos enable version-controlled infrastructure
+* *Network security*: NetworkPolicies control pod-to-pod traffic in multi-tenant sandbox environments
+
+== Architecture Overview
+
+The Foreman deployment consists of three tiers: application, data, and queue infrastructure.
+
+=== Component Diagram
+
+[source,text]
+----
+┌─────────────────────────────────────────────────────┐
+│ Foreman Pod (single replica, Recreate strategy)    │
+│                                                     │
+│  ┌─────────────┐ ┌──────────────┐ ┌────────────┐  │
+│  │ foreman-app │ │ orchestrator │ │   worker   │  │
+│  │  (Rails)    │ │  (Sidekiq)   │ │ (Sidekiq)  │  │
+│  │  port 3000  │ │  c: 1        │ │  c: 15     │  │
+│  └──────┬──────┘ └──────┬───────┘ └─────┬──────┘  │
+│         │                │                │         │
+└─────────┼────────────────┼────────────────┼─────────┘
+          │                │                │
+          │                └────────┬───────┘
+          │                         │
+     ┌────▼──────┐          ┌───────▼────────┐
+     │PostgreSQL │          │  Redis Tasks   │
+     │StatefulSet│          │  (StatefulSet) │
+     │  10Gi PVC │          │    2Gi AOF     │
+     └───────────┘          └────────────────┘
+          │                         │
+          │                 ┌───────▼────────┐
+          │                 │  Redis Cache   │
+          │                 │  (Deployment)  │
+          │                 │  256Mi in-mem  │
+          │                 └────────────────┘
+          │
+     External Access via OpenShift Route
+     https://foreman-{guid}.{domain}/
+----
+
+=== Application Tier: Multi-Container Pod
+
+The Foreman pod runs three containers sharing the same network namespace:
+
+[cols="1,1,2",options="header"]
+|===
+|Container |Resources |Purpose
+
+|`foreman-app`
+|1500m CPU / 2Gi RAM
+|Rails web server and API endpoint (Puma). Handles HTTP requests, renders UI, serves `/api/` endpoints. Includes liveness/readiness probes on `/api/ping`.
+
+|`orchestrator`
+|500m CPU / 512Mi RAM
+|Sidekiq worker with concurrency: 1. Processes `dynflow_orchestrator` queue. Single-threaded coordinator for Foreman's async workflow engine (Dynflow). Must remain single-instance.
+
+|`worker`
+|500m CPU / 512Mi RAM
+|Sidekiq worker with concurrency: 15. Processes `default` and `remote_execution` queues. Multi-threaded background job processor for provisioning tasks, package syncs, report generation.
+|===
+
+*Why colocated?* Shared logging namespace (one `oc logs` command), reduced network latency, unified resource accounting, simpler coordination during scaling.
+
+*Total pod resources:* 2.5 cores / 3GB RAM requested, 4 cores / 8GB limit. Exceeds Foreman's minimum requirements (4 cores / 4GB) with headroom for orchestration overhead.
+
+=== Data Tier: PostgreSQL StatefulSet
+
+PostgreSQL stores all Foreman data: hosts, content views, users, settings, job history.
+
+*Key attributes:*
+
+* *StatefulSet* with `volumeClaimTemplate` for per-pod PVC binding
+* *10Gi storage* with configurable `storageClass` (defaults to cluster default)
+* *Service name:* `{release-name}-postgresql` for DNS stability
+* *Image:* `registry.redhat.io/rhel9/postgresql-16:1` (RHEL registry, OpenShift-native)
+* *Health checks:* `/usr/libexec/check-container` liveness/readiness probes
+
+*Why StatefulSet?* Persistent state requires stable identity. Pod name `foreman-postgresql-0` remains constant across restarts. PVC binding survives pod rescheduling.
+
+=== Queue Tier: Dual Redis Strategy
+
+Foreman uses Redis for two distinct purposes with different persistence requirements:
+
+[cols="1,1,1,1",options="header"]
+|===
+|Component |Deployment Type |Persistence |Purpose
+
+|`redis-cache`
+|Deployment
+|None (in-memory)
+|Rails object cache. Ephemeral data with LRU eviction policy. Stores serialized ActiveRecord objects, fragment caching, session data.
+
+|`redis-tasks`
+|StatefulSet
+|2Gi AOF (Append-Only File)
+|Dynflow job queue. Persistent queue for background tasks. Requires durability to prevent job loss on restart.
+|===
+
+*Redis-cache configuration:*
+[source,bash,role=copypaste]
+----
+redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+----
+
+*Redis-tasks configuration:*
+[source,bash,role=copypaste]
+----
+redis-server --appendonly yes --dir /var/lib/redis/data
+----
+
+*Why separate instances?* Cache can be rebuilt (volatile), queue cannot be lost (durability). Different memory profiles: cache uses LRU eviction, queue needs persistence.
+
+=== Dependency and Initialization Order
+
+The Foreman pod uses **initContainers** to enforce startup ordering:
+
+[source,yaml,role=copypaste]
+----
+initContainers:
+  # Stage 1: Wait for PostgreSQL
+  - name: wait-postgres
+    image: registry.redhat.io/rhel9/postgresql-16:1
+    command:
+      - sh
+      - -c
+      - |
+        until pg_isready -h foreman-postgresql -p 5432 -U foreman; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+
+  # Stage 2: Initialize database
+  - name: db-init
+    image: quay.io/foreman/foreman:3.13-stable
+    command:
+      - sh
+      - -c
+      - |
+        bundle exec rake db:migrate    # Apply schema migrations
+        bundle exec rake db:seed        # Load initial data
+        bundle exec rake permissions:reset password={{ adminPassword }}
+----
+
+Main containers (`foreman-app`, `orchestrator`, `worker`) start only after both initContainers succeed. This prevents:
+
+* Schema migration conflicts from parallel execution
+* Application errors from connecting before database readiness
+* Race conditions in multi-replica scenarios (currently single replica)
+
+=== Service Discovery and DNS
+
+All inter-pod communication uses Kubernetes **ClusterIP services** with internal DNS:
+
+[cols="1,1,2",options="header"]
+|===
+|Service Name |Port |Resolves To
+
+|`foreman`
+|3000
+|Foreman app pod (all three containers share pod IP)
+
+|`foreman-postgresql`
+|5432
+|PostgreSQL StatefulSet pod
+
+|`foreman-redis-cache`
+|6379
+|Redis cache Deployment pod
+
+|`foreman-redis-tasks`
+|6379
+|Redis tasks StatefulSet pod
+|===
+
+*Environment variable binding* (shared via YAML anchor):
+[source,yaml,role=copypaste]
+----
+env:
+  - name: DATABASE_URL
+    value: postgres://foreman:$(POSTGRES_PASSWORD)@foreman-postgresql:5432/foreman?pool=5
+  - name: FOREMAN_RAILS_CACHE_STORE_URLS
+    value: redis://foreman-redis-cache:6379/0
+  - name: DYNFLOW_REDIS_URL
+    value: redis://foreman-redis-tasks:6379/0
+----
+
+No external DNS required. Pods discover each other via service names in the same namespace.
+
+== Helm Chart Integration with Showroom
+
+Custom Helm charts in Showroom repos enable GitOps-driven lab infrastructure. The `ocp4_workload_helm_from_content_repo` AgnosticD role deploys charts directly from the content repository without requiring a Helm chart registry.
+
+=== Repository Structure
+
+[source,text]
+----
+zt-wilson-poc/                    ← Content repository
+├── foreman-chart/                ← Custom Helm chart (co-located with content)
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       ├── foreman-deployment.yaml
+│       ├── postgresql-statefulset.yaml
+│       ├── redis-cache.yaml
+│       ├── redis-tasks.yaml
+│       ├── secret-postgresql.yaml
+│       └── _helpers.tpl
+├── config/
+│   ├── helm-charts.yaml          ← Deployment manifest (AgnosticD reads this)
+│   ├── firewall.yaml             ← NetworkPolicy rules
+│   └── instances.yaml            ← VM definitions (empty for Helm-only)
+└── content/                      ← Showroom documentation
+    └── modules/ROOT/pages/
+        └── index.adoc
+----
+
+*Key insight:* Charts live in the content repo, not an external registry. This enables:
+
+* Version control alongside lab documentation
+* No dependency on external Helm repositories
+* Auditable changes via Git history
+* Simplified offline/disconnected deployments
+
+=== Step 1: Create the Helm Chart
+
+==== Chart.yaml Metadata
+
+[source,yaml,role=copypaste]
+----
+apiVersion: v2
+name: foreman
+description: Foreman lifecycle management platform for OpenShift
+version: 1.0.0        # Chart version (SemVer)
+appVersion: "3.13"    # Foreman application version
+type: application
+----
+
+*Requirements for RHDP integration:*
+
+* `name` must match `charts[].name` in `helm-charts.yaml`
+* `apiVersion: v2` (Helm 3 format)
+* `type: application` (not `library`)
+
+==== values.yaml Structure
+
+RHDP provides three critical variables at deployment time:
+
+[source,yaml,role=copypaste]
+----
+# Provided by AgnosticD at provisioning time
+guid: ""              # Unique deployment ID (e.g., "abc123")
+domain: ""            # Cluster wildcard domain (e.g., "apps.ocpvdev01.rhdp.net")
+
+foreman:
+  adminPassword: ""   # Auto-generated if empty (uses {{ common_password }})
+----
+
+*FQDN generation:*
+[source,yaml,role=copypaste]
+----
+# In foreman-deployment.yaml template
+- name: FOREMAN_FQDN
+  value: foreman-{{ .Values.guid }}.{{ .Values.domain }}
+----
+
+Result: `foreman-abc123.apps.ocpvdev01.rhdp.net`
+
+==== Template Organization
+
+Organize templates by component type for readability:
+
+[cols="1,2",options="header"]
+|===
+|Template File |Contains
+
+|`foreman-deployment.yaml`
+|Service + Deployment with 3 containers + initContainers
+
+|`postgresql-statefulset.yaml`
+|Service + StatefulSet + volumeClaimTemplate
+
+|`redis-cache.yaml`
+|Service + Deployment (ephemeral)
+
+|`redis-tasks.yaml`
+|Service + StatefulSet + volumeClaimTemplate
+
+|`secret-postgresql.yaml`
+|Secret with auto-generated password (if not provided)
+
+|`_helpers.tpl`
+|Reusable template functions (optional)
+|===
+
+*Template best practice:* Use `{{ .Release.Name }}-component` naming pattern for all resources. This prevents naming conflicts when multiple releases exist in the same namespace.
+
+=== Step 2: Configure helm-charts.yaml
+
+The `config/helm-charts.yaml` file tells AgnosticD which charts to deploy and how to configure them.
+
+[source,yaml,role=copypaste]
+----
+---
+charts:
+  - name: foreman                        # Must match Chart.yaml name
+    enabled: true
+
+    source:
+      type: path                         # Chart from content repo (not repository URL)
+      path: foreman-chart                # Relative path from repo root
+
+    release:
+      name: foreman                      # Helm release name
+      values:
+        guid: "{{ guid }}"               # Provided by AgnosticD
+        domain: "{{ apps_domain }}"      # Cluster wildcard domain
+        foreman:
+          adminPassword: "{{ common_password }}"  # Auto-generated by AgnosticD
+
+    security:
+      allowClusterScopedResources: false # Prevent ClusterRole, CRD creation
+      allowPrivileged: false             # No privileged containers
+      allowHostPath: false               # No host filesystem access
+      maxCpuLimit: 2000m                 # Foreman app container limit
+      maxMemoryLimit: 4Gi                # Foreman app container limit
+      maxStorageClaim: 10Gi              # PostgreSQL PVC size
+
+    wait:
+      enabled: true
+      timeout: 600  # 10 minutes for database initialization and migration
+
+    routes:
+      - name: foreman
+        service: foreman                 # ClusterIP service name
+        host: foreman                    # Becomes: foreman-{guid}.{domain}
+        targetPort: http                 # Named port from service
+        tls: true
+        tls_termination: edge            # TLS terminates at OpenShift router
+----
+
+==== Field Explanations
+
+*source.type: path*
+
+Charts can come from two sources:
+[cols="1,2",options="header"]
+|===
+|Type |Use Case
+
+|`path`
+|Chart in content repo (our case). AgnosticD uses `helm template` on local files.
+
+|`repository`
+|Chart from Helm registry (e.g., Bitnami). Requires `url`, `chart_ref`, `version`.
+|===
+
+*security.** (Resource Limits)
+
+The workload validates rendered templates against these constraints:
+
+* `allowClusterScopedResources: false` — Blocks ClusterRole, ClusterRoleBinding, CRD, Namespace creation
+* `allowPrivileged: false` — Rejects pods with `securityContext.privileged: true`
+* `allowHostPath: false` — Rejects `hostPath` volumes
+* `maxCpuLimit / maxMemoryLimit` — Validates container `resources.limits` don't exceed caps
+* `maxStorageClaim` — Validates PVC `spec.resources.requests.storage` size
+
+If validation fails, provisioning aborts with error details in AgnosticD logs.
+
+*wait.enabled*
+
+When `true`, AgnosticD runs:
+[source,bash,role=copypaste]
+----
+helm upgrade --install --wait --timeout 600s ...
+----
+
+This blocks provisioning until all pods reach `Ready` state or timeout expires. Critical for:
+
+* Database initialization (schema migrations can take minutes)
+* Preventing race conditions with dependent workloads
+* Early failure detection (pod won't start? provisioning fails fast)
+
+*routes[] (OpenShift Route Creation)*
+
+AgnosticD creates Routes **after** Helm deployment succeeds. Route spec:
+
+[source,yaml,role=copypaste]
+----
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: foreman
+spec:
+  host: foreman-{{ guid }}.{{ apps_domain }}
+  to:
+    kind: Service
+    name: foreman
+  port:
+    targetPort: http
+  tls:
+    termination: edge              # TLS ends at router, plain HTTP to pod
+    insecureEdgeTerminationPolicy: Redirect
+----
+
+`tls_termination: edge` means:
+
+* Client connects via HTTPS to router
+* Router terminates TLS, forwards plain HTTP to pod port 3000
+* No TLS certificate management in pod (OpenShift handles it)
+
+Alternative: `reencrypt` for end-to-end encryption (requires pod TLS cert).
+
+=== Step 3: Add NetworkPolicy Rules (config/firewall.yaml)
+
+AgnosticD applies a **default-deny NetworkPolicy** in `post_software.yml` to lock down lab environments. You must explicitly allow required traffic.
+
+[source,yaml,role=copypaste]
+----
+---
+ingress:
+  # Allow HTTP/HTTPS from anywhere (Foreman web UI access)
+  - from:
+      - ipBlock:
+          cidr: 0.0.0.0/0
+    ports:
+      - protocol: TCP
+        port: 80
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 3000  # Foreman app (accessed via Route)
+
+  # Allow database connections within namespace
+  - from:
+      - podSelector: {}  # Any pod in this namespace
+    ports:
+      - protocol: TCP
+        port: 5432  # PostgreSQL
+      - protocol: TCP
+        port: 6379  # Redis (both cache and tasks)
+
+egress:
+  # DNS for service discovery
+  - to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: openshift-dns
+    ports:
+      - protocol: UDP
+        port: 5353
+      - protocol: TCP
+        port: 5353
+
+  # PostgreSQL connections within namespace
+  - ports:
+      - protocol: TCP
+        port: 5432
+
+  # Redis connections within namespace
+  - ports:
+      - protocol: TCP
+        port: 6379
+
+  # Foreman app connections (for CLI terminal)
+  - ports:
+      - protocol: TCP
+        port: 3000
+
+  # HTTPS for external connections (package downloads, content sync)
+  - ports:
+      - protocol: TCP
+        port: 443
+
+  # HTTP for external connections
+  - ports:
+      - protocol: TCP
+        port: 80
+----
+
+==== Why NetworkPolicies Matter
+
+RHDP's provisioning flow (from ZEROTOUCH_BRIEFING.md §3):
+
+. `pre_software.yml` — Runs with full network access (Satellite registration, package installs)
+. `workloads.yml` — Deploys Helm charts, creates Routes
+. `post_software.yml` — **Applies NetworkPolicy lockdown**
+
+After lockdown:
+
+* Egress to port 443 is allowed (for normal operation)
+* Pod-to-pod traffic requires explicit firewall.yaml rules
+* External access via Routes still works (OpenShift router is outside policy scope)
+
+*Common mistake:* Forgetting port 3000 egress for CLI terminal. The Showroom terminal container must reach the Foreman API (`http://foreman:3000/api/`) to run hammer commands. Without the egress rule, `hammer ping` fails with connection timeout.
+
+== AgnosticD Deployment Workload
+
+The `ocp4_workload_helm_from_content_repo` role orchestrates Helm chart deployment in RHDP labs.
+
+=== How It Works
+
+The workload reads `config/helm-charts.yaml` and processes each enabled chart:
+
+[source,text]
+----
+1. Clone content repo (if not already present)
+   ↓
+2. Read config/helm-charts.yaml
+   ↓
+3. For each chart where enabled: true
+   ├─ Validate security constraints
+   ├─ Substitute AgnosticD variables (guid, apps_domain, common_password)
+   ├─ Run: helm template <release-name> <chart-path> -f <values>
+   ├─ Apply rendered YAML to namespace
+   ├─ If wait.enabled: Block until pods Ready (timeout: wait.timeout)
+   └─ Create OpenShift Routes (if routes[] defined)
+   ↓
+4. Apply NetworkPolicy from config/firewall.yaml
+----
+
+=== Variable Substitution
+
+AgnosticD provides these variables at deployment time:
+
+[cols="1,1,2",options="header"]
+|===
+|Variable |Example Value |Where It Comes From
+
+|`{{ guid }}`
+|`abc123`
+|Unique deployment ID from Babylon/Poolboy
+
+|`{{ apps_domain }}`
+|`apps.ocpvdev01.rhdp.net`
+|Cluster's wildcard domain (`oc get ingresses.config/cluster -o jsonpath='{.spec.domain}'`)
+
+|`{{ common_password }}`
+|`rH3dP4ssw0rd!`
+|Auto-generated 32-char password (alphanumeric + symbols)
+|===
+
+These are substituted in `helm-charts.yaml` **before** Helm rendering:
+
+[source,yaml,role=copypaste]
+----
+# Before substitution (in Git)
+values:
+  guid: "{{ guid }}"
+  domain: "{{ apps_domain }}"
+  foreman:
+    adminPassword: "{{ common_password }}"
+
+# After substitution (passed to helm template)
+values:
+  guid: "abc123"
+  domain: "apps.ocpvdev01.rhdp.net"
+  foreman:
+    adminPassword: "rH3dP4ssw0rd!"
+----
+
+Helm then renders templates with these values:
+
+[source,yaml,role=copypaste]
+----
+# In foreman-deployment.yaml template
+- name: FOREMAN_FQDN
+  value: foreman-{{ .Values.guid }}.{{ .Values.domain }}
+
+# Rendered output
+- name: FOREMAN_FQDN
+  value: foreman-abc123.apps.ocpvdev01.rhdp.net
+----
+
+=== Security Policy Validation
+
+Before applying rendered YAML, the workload scans for policy violations:
+
+[cols="1,2",options="header"]
+|===
+|Policy Check |Enforcement
+
+|Cluster-scoped resources
+|Rejects: ClusterRole, ClusterRoleBinding, CRD, Namespace, PriorityClass
+
+|Privileged containers
+|Rejects: `securityContext.privileged: true` in any container
+
+|Host path volumes
+|Rejects: `hostPath` in `spec.volumes[]`
+
+|CPU limits
+|Rejects: `resources.limits.cpu` > `maxCpuLimit` in any container
+
+|Memory limits
+|Rejects: `resources.limits.memory` > `maxMemoryLimit` in any container
+
+|Storage claims
+|Rejects: PVC `spec.resources.requests.storage` > `maxStorageClaim`
+|===
+
+If validation fails:
+
+[source,text]
+----
+TASK [ocp4_workload_helm_from_content_repo : Validate security constraints] ***
+fatal: [localhost]: FAILED! => {
+  "msg": "Chart 'foreman' violates security policy: Container 'foreman-app'
+  requests 4000m CPU, exceeds maxCpuLimit: 2000m"
+}
+----
+
+Provisioning aborts. Fix the chart or increase the limit in `helm-charts.yaml`.
+
+=== Route Creation Flow
+
+Routes are created **after** successful Helm deployment:
+
+[source,yaml,role=copypaste]
+----
+# AgnosticD creates this resource for each routes[] entry
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: foreman-abc123              # Includes GUID
+  namespace: sandbox-abc123-demo
+  labels:
+    app.kubernetes.io/managed-by: agnosticd
+spec:
+  host: foreman-abc123.apps.ocpvdev01.rhdp.net
+  to:
+    kind: Service
+    name: foreman
+    weight: 100
+  port:
+    targetPort: http                # Named port from Service
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+----
+
+*Why separate from Helm?* Routes require the GUID in the hostname, which Helm doesn't know about (it's a deployment-time variable, not a chart variable). AgnosticD handles the GUID substitution and Route creation.
+
+=== Debugging Tips
+
+==== Check Helm Release Status
+
+[source,bash,role=copypaste]
+----
+helm list -n sandbox-abc123-demo
+
+# Output
+NAME       NAMESPACE              REVISION  STATUS    CHART         APP VERSION
+foreman    sandbox-abc123-demo    1         deployed  foreman-1.0.0 3.13
+----
+
+If `STATUS` is not `deployed`, check workload logs:
+
+[source,bash,role=copypaste]
+----
+oc logs -n babylon-jobs <provisioning-job-pod> --tail=100
+----
+
+==== View Pod Logs
+
+[source,bash,role=copypaste]
+----
+# Main application
+oc logs deployment/foreman -c foreman-app -n sandbox-abc123-demo
+
+# Database initialization
+oc logs deployment/foreman -c db-init -n sandbox-abc123-demo
+
+# Background worker
+oc logs deployment/foreman -c worker -n sandbox-abc123-demo
+----
+
+==== Inspect NetworkPolicy
+
+[source,bash,role=copypaste]
+----
+oc get networkpolicy -n sandbox-abc123-demo -o yaml
+
+# Look for:
+# - Egress rules allowing ports 3000, 5432, 6379
+# - Ingress rules allowing 80, 443 from 0.0.0.0/0
+----
+
+==== Database Init Failures
+
+If `db-init` initContainer fails:
+
+[source,bash,role=copypaste]
+----
+# Get initContainer logs
+oc logs deployment/foreman -c db-init --previous
+
+# Common issues:
+# - "could not connect to server" → PostgreSQL not ready (check wait-postgres logs)
+# - "permission denied" → Secret password mismatch
+# - "relation already exists" → Helm release not cleaned up before retry
+----
+
+Fix: Delete the release and redeploy:
+
+[source,bash,role=copypaste]
+----
+helm uninstall foreman -n sandbox-abc123-demo
+oc delete pvc --all -n sandbox-abc123-demo  # Remove old PVCs
+# Trigger new provisioning
+----
+
+== Verification and Access
+
+=== Access Methods
+
+[cols="1,1,2",options="header"]
+|===
+|Interface |URL Pattern |Authentication
+
+|Web UI
+|`https://foreman-${guid}.${domain}/`
+|Username: `admin` / Password: `{{ common_password }}`
+
+|API
+|`https://foreman-${guid}.${domain}/api/ping`
+|HTTP Basic Auth or session cookies
+
+|CLI Terminal
+|Showroom tab: `/foreman-cli`
+|Hammer pre-configured with `common_password`
+|===
+
+=== Health Check Commands
+
+[source,bash,role=copypaste]
+----
+# Verify all pods are Running
+oc get pods -n sandbox-abc123-demo
+
+# Expected output:
+# NAME                                   READY   STATUS    RESTARTS
+# foreman-7f76486fc5-xxxxx               3/3     Running   0
+# foreman-postgresql-0                   1/1     Running   0
+# foreman-redis-cache-5486d5d8c8-xxxxx   1/1     Running   0
+# foreman-redis-tasks-0                  1/1     Running   0
+
+# Verify PVCs are Bound
+oc get pvc -n sandbox-abc123-demo
+
+# Expected output:
+# NAME                      STATUS   VOLUME       CAPACITY   STORAGECLASS
+# postgresql-data-foreman-postgresql-0   Bound    pvc-xxx      10Gi       gp3
+# redis-tasks-data-foreman-redis-tasks-0 Bound    pvc-yyy      2Gi        gp3
+
+# Check Route exists
+oc get route foreman -n sandbox-abc123-demo
+
+# Test API connectivity
+curl -k https://foreman-abc123.apps.ocpvdev01.rhdp.net/api/ping
+
+# Expected: {"status":"ok"}
+----
+
+=== Common Issues and Fixes
+
+==== Pod CrashLoopBackOff
+
+*Symptom:*
+[source,text]
+----
+foreman-7f76486fc5-xxxxx   0/3     CrashLoopBackOff   5
+----
+
+*Diagnosis:*
+[source,bash,role=copypaste]
+----
+oc describe pod foreman-7f76486fc5-xxxxx -n sandbox-abc123-demo
+oc logs foreman-7f76486fc5-xxxxx -c foreman-app -n sandbox-abc123-demo
+----
+
+*Common causes:*
+
+* Database connection failure → Check `DATABASE_URL` environment variable
+* Redis connection failure → Check Redis service DNS resolution
+* Migration error → Check `db-init` initContainer logs
+
+==== Database Timeout During Provisioning
+
+*Symptom:*
+[source,text]
+----
+TASK [ocp4_workload_helm_from_content_repo : Wait for chart readiness] ***
+fatal: Timed out waiting for pods to become ready (timeout: 600s)
+----
+
+*Fix:* Increase `wait.timeout` in `helm-charts.yaml`:
+
+[source,yaml,role=copypaste]
+----
+wait:
+  enabled: true
+  timeout: 900  # 15 minutes for slower environments
+----
+
+Large database migrations or slow storage can exceed 10-minute default.
+
+==== NetworkPolicy Blocking Pod Communication
+
+*Symptom:*
+[source,text]
+----
+# From foreman-app container
+curl http://foreman-postgresql:5432
+# Timeout (no response)
+----
+
+*Diagnosis:*
+[source,bash,role=copypaste]
+----
+oc get networkpolicy lock-bastion-abc123 -o yaml
+
+# Check egress rules include:
+# - ports: [{protocol: TCP, port: 5432}]  # PostgreSQL
+# - ports: [{protocol: TCP, port: 6379}]  # Redis
+# - ports: [{protocol: TCP, port: 3000}]  # Foreman (for CLI terminal)
+----
+
+*Fix:* Add missing port to `config/firewall.yaml` egress section.
+
+==== Route 404 Not Found
+
+*Symptom:*
+[source,bash,role=copypaste]
+----
+curl https://foreman-abc123.apps.ocpvdev01.rhdp.net
+# 404 Not Found
+----
+
+*Diagnosis:*
+[source,bash,role=copypaste]
+----
+oc get route foreman -n sandbox-abc123-demo
+
+# Check:
+# 1. Route exists
+# 2. host matches expected FQDN
+# 3. spec.to.name matches Service name
+# 4. spec.port.targetPort matches Service port name
+----
+
+*Common cause:* Service name mismatch. Route `spec.to.name` must exactly match `metadata.name` of the ClusterIP Service.
+
+== Summary
+
+You now understand how to deploy Foreman on OpenShift using custom Helm charts integrated with RHDP Zerotouch labs.
+
+*What you learned:*
+
+* **Foreman's Kubernetes-native architecture**: Multi-container pods, StatefulSets for persistence, service discovery via DNS
+* **Custom Helm chart integration**: Co-locate charts with lab content, use `source.type: path` for GitOps workflow
+* **AgnosticD workload configuration**: Variable substitution, security validation, Route creation, NetworkPolicy enforcement
+* **NetworkPolicy for lab environments**: Explicit egress/ingress rules required after post_software lockdown
+
+=== Advanced Topics for Future Exploration
+
+* **Scaling workers**: Separate `worker` container into dedicated Deployment for horizontal scaling
+* **External authentication**: Integrate with LDAP, Keycloak, or SAML for SSO
+* **Smart Proxy deployment**: Add Foreman Smart Proxies as separate Helm chart for distributed content delivery
+* **PVC backup strategies**: Volume snapshots, Velero integration for database disaster recovery
+* **Multi-cluster orchestration**: Deploy Foreman in one cluster, manage resources in others via Smart Proxies
+* **Custom content views**: Automate repository synchronization, content view publishing via Ansible
+
+=== Additional Resources
+
+* Foreman Documentation: https://theforeman.org/manuals/latest/
+* Helm Chart Best Practices: https://helm.sh/docs/chart_best_practices/
+* OpenShift NetworkPolicies: https://docs.openshift.com/container-platform/latest/networking/network_policy/about-network-policy.html
+* RHDP Platform Briefing: `~/Projects/cursor-revisit/ZEROTOUCH_BRIEFING.md`
+* AgnosticD Helm Workload: `ansible/roles_ocp_workloads/ocp4_workload_helm_from_content_repo/`
+
+== Conclusion
+
+Deploying lifecycle management infrastructure like Foreman on OpenShift demonstrates the power of Kubernetes-native application packaging. Helm charts provide repeatable, version-controlled deployments with minimal operational overhead compared to traditional VM-based approaches.
+
+By integrating custom charts directly into Showroom lab repositories, RHDP engineers can deliver fully-configured infrastructure services as part of the lab experience—no manual deployment steps required. The AgnosticD workload handles GitOps-driven provisioning, security validation, and Route creation, enabling focus on lab content rather than infrastructure plumbing.
+
+This pattern extends beyond Foreman to any multi-tier application stack: observability platforms (Prometheus, Grafana), CI/CD tools (Jenkins, Tekton), databases (MongoDB, Cassandra), or custom microservices architectures. The `ocp4_workload_helm_from_content_repo` role provides a consistent deployment framework for all Helm-based lab infrastructure.

@@ -1,104 +1,74 @@
-=== Getting Started
+= Foreman on OpenShift with Helm
 
-* Create a git repo from this template
-* Clone the repo and *cd* into it
+A demonstration of deploying Foreman 3.13 lifecycle management platform on OpenShift using custom Helm charts integrated with the RHDP Zerotouch platform.
 
-=== Understanding the Basic Template Directory Structure
+== Overview
 
-. Content Directory
-+
-.tree output
-[source,shell]
-----
-.
-├── README.adoc                 # Readme file
-├── config                      # Defines VMs, network and firewall
-├── runtime-automation          # Scripts directory for setup/next/solve modules 
-├── setup-automation            # Scripts directory when provisioning
-├── ui-config.yml               # Configuration file
-├── site.yml                    # Theme config
-└── content                     # Content directory
-    ├── antora.yml              # Antora configuration file. You can add "inline vars" here to render within your content
-    └── modules/ROOT
-        ├── assets
-        │   └── images                       # Images used in your content 
-        │       └── example-image.png
-        ├── pages                            # Your content goes here
-        │   ├── module-01.adoc               # First module of your lab, e.g. overview etc 
-        │   ├── module-02.adoc               # Second module of your lab  
-        │   └── module-03.adoc               # Third module
-----
+This repository contains a production-ready Helm chart for Foreman along with comprehensive documentation explaining the architecture, deployment patterns, and AgnosticD workload configuration.
 
-. Lab definition directory
-+
-.tree output
-[source,shell]
-----
-config/
-├── firewall.yaml                           # Define the egress/ingress rules to be allowed
-├── instances.yaml                          # Define the instances to be created
-└── networks.yml                            # Define the networks to be created
-----
+== What's Included
 
+=== Helm Chart (`foreman-chart/`)
 
-. Runtime Scripts Directory Structure
-+
-.tree output
-[source,shell]
-----
-runtime-automation/
-├── module_1                            # The directory name should be the same as 
-│                                       # the module content page name
-│   ├── setup.sh                        # Setup playbook which run at start of module 
-│                                       # and when clicked on next button
-│   ├── solve.sh                        # Solve playbook, run when clicked on solve button
-│   └── validation.sh                   # Validation playbook, run when click on next button
-├── ansible.cfg                         # Ansible configuration used with module playbooks
-└── main.yml                            # Playbook to be called in each step
-----
+Custom Helm chart deploying Foreman with:
 
-. Setup Scripts Directory Structure
-+
-.tree output
-[source,shell]
-----
-setup-automation/
-├── setup-vmname.sh                     # Script to be executed on vmname when is provisioned
-├── ansible.cfg                         # Ansible configuration used with module playbooks
-└── main.yml                            # Playbook to be called in each step
-----
+* **Multi-tier architecture**: Application pod (Rails + Sidekiq), PostgreSQL StatefulSet, dual Redis instances
+* **RHDP integration**: GUID/domain templating, common_password support, Route creation
+* **Production-ready**: Resource limits, health checks, initContainer dependency ordering
+* **OpenShift native**: RHEL 9 base images, NetworkPolicy support, SCC compatible
 
+=== Configuration (`config/`)
 
-== Understanding UI Configration file
-. Example: The *ui-config.yml* configuration file
-+
-.tree output
-[source,shell]
-----
-antora:
-  name: modules
-  dir: www
-  modules:
-    - name: 01-playbook-inventory               # Module Name
-      label: Playbook Inventory                 # Module Label
-      solveButton: true                         # Enable Solve button
-    - name: 02-playbook-directory-structure
-      label: Playbook Directory Structure
-      solveButton: true
-tabs:
-  - name: VSCode Editor                         # Tab name
-    port: 8443                                  # Port no of the service
-    path: /?folder=/home/rhel/ansible-files/    # Path suffix
-  - name: ">_control"                           # Tab name
-    port: 443                                   # Port of the tt1 terminal
-    path: /tty1                                 # Path to the tty1 terminal
-----
+* **`helm-charts.yaml`**: Deployment manifest for AgnosticD's `ocp4_workload_helm_from_content_repo`
+* **`firewall.yaml`**: NetworkPolicy rules for pod-to-pod and external communication
+* **`instances.yaml`**: Empty (Helm-only deployment, no VMs)
 
-=== Development Cycle
+=== Documentation (`content/`)
 
-. Edit your content in `content/modules/ROOT/pages/`
-. Use `git` to branch and commit your work
-. Push your work to your repo
-.. You should use `git tags` or `git branches` in production
-.. However development items default to the head of `main`
+Comprehensive technical blog covering:
 
+* Foreman's Kubernetes architecture and component relationships
+* Helm chart integration patterns for Showroom labs
+* AgnosticD workload configuration and variable substitution
+* NetworkPolicy setup for lab environments
+* Troubleshooting and verification procedures
+
+== Target Audience
+
+RHDP team members and lab developers familiar with OpenShift and Helm who want to understand how to integrate custom Helm charts into zerotouch lab deployments.
+
+== Deployment
+
+This repository is designed to be provisioned via AgnosticD's zerotouch workflow:
+
+1. **Content repo**: Catalog item references this repo via `ocp4_workload_showroom_content_git_repo`
+2. **Helm workload**: `ocp4_workload_helm_from_content_repo` reads `config/helm-charts.yaml`
+3. **Chart deployment**: Helm renders `foreman-chart/` with GUID and domain substitution
+4. **Route creation**: AgnosticD creates OpenShift Route for external access
+5. **NetworkPolicy**: Firewall rules applied in `post_software` phase
+
+== Access
+
+After deployment:
+
+* **Web UI**: `https://foreman-{guid}.{domain}/`
+* **API**: `https://foreman-{guid}.{domain}/api/ping`
+* **Credentials**: Username `admin` / Password from `{{ common_password }}`
+
+== Architecture Highlights
+
+* **Single-pod deployment** with 3 containers: foreman-app, orchestrator, worker
+* **StatefulSet for PostgreSQL** (10Gi PVC) and Redis-tasks (2Gi AOF persistence)
+* **Deployment for Redis-cache** (256Mi in-memory, LRU eviction)
+* **InitContainers** enforce startup ordering: wait-postgres → db-init → main containers
+* **Service discovery** via Kubernetes ClusterIP services and DNS
+
+== Resources
+
+* Foreman Documentation: https://theforeman.org/manuals/latest/
+* RHDP Zerotouch Briefing: `~/Projects/cursor-revisit/ZEROTOUCH_BRIEFING.md`
+* AgnosticD Helm Workload: `ansible/roles_ocp_workloads/ocp4_workload_helm_from_content_repo/`
+
+== License
+
+This demonstration repository is provided as-is for RHDP team use and learning purposes.

@@ -86,7 +86,7 @@ spec:
           echo "Database initialization complete"
         env: &foreman_env
         - name: RAILS_ENV
-          value: {{ .Values.rails.env }}
+          value: "{{ .Values.rails.env }}"
         - name: RAILS_MAX_THREADS
           value: {{ .Values.rails.maxThreads | quote }}
         # POSTGRES_PASSWORD must be defined before DATABASE_URL for variable expansion

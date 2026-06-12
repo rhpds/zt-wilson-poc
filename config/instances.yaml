@@ -1,9 +1,11 @@
 ---
-# Foreman deployment via Helm chart
+# Foreman deployment via Helm chart (no VMs, only Helm-deployed infrastructure)
 virtualmachines: []
 containers:
-  - name: foreman-tooling
+  - name: foreman-tools
     image: quay.io/foreman/foreman-toolbox:latest
+    ports:
+      - 8080
     terminals:
       - name: foreman-cli
         command: /bin/bash

@@ -1,4 +1,35 @@
 ---
-# Helm-only testing configuration - no VMs or containers needed
+# Helm-based Foreman deployment with CLI container
 virtualmachines: []
-containers: []
+
+containers:
+  - name: foreman-cli
+    image: quay.io/foreman/foreman:3.13-stable
+    memory: 512Mi
+    cpu: 250m
+    ports:
+      - name: dummy
+        containerPort: 9999
+        protocol: TCP
+    environment:
+      FOREMAN_HOST: "https://foreman-${guid}.${domain}/"
+      FOREMAN_USERNAME: "admin"
+      FOREMAN_PASSWORD: "{{ common_password }}"
+    terminals:
+      - name: foreman-cli
+        command: /bin/bash
+    commands:
+      - mkdir -p /root/.hammer/cli.modules.d/
+      - |
+        cat > /root/.hammer/cli.modules.d/foreman.yml <<EOF
+        :foreman:
+          :enable_module: true
+          :host: '${FOREMAN_HOST}'
+          :username: '${FOREMAN_USERNAME}'
+          :password: '${FOREMAN_PASSWORD}'
+          :verify_ssl: false
+          :request_timeout: 120
+        EOF
+      - hammer --version
+      - hammer ping || echo "Foreman API not ready yet (normal during startup)"
+      - echo "Foreman CLI configured - admin password: ${FOREMAN_PASSWORD}"

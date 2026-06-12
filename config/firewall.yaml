@@ -60,6 +60,11 @@ egress:
       - protocol: TCP
         port: 6379
 
+  # Foreman app connections within namespace (for hammer CLI in terminal)
+  - ports:
+      - protocol: TCP
+        port: 3000
+
   # HTTPS for external connections (package downloads, etc.)
   - ports:
       - protocol: TCP

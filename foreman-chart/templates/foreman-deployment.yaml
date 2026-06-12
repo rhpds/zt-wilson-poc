@@ -79,10 +79,8 @@ spec:
         - |
           echo "Running database migrations..."
           bundle exec rake db:migrate
-          echo "Seeding database..."
-          bundle exec rake db:seed
-          echo "Resetting permissions..."
-          bundle exec rake permissions:reset password={{ .Values.foreman.adminPassword | default "changeme" }}
+          echo "Seeding database and resetting admin password..."
+          bundle exec rake db:seed permissions:reset password={{ .Values.foreman.adminPassword | default "changeme" }}
           echo "Database initialization complete"
         env: &foreman_env
         - name: RAILS_ENV

@@ -37,7 +37,7 @@ containers:
         CONFIGEOF
 
         # Create custom bashrc for terminal
-        cat > /root/.foreman_bashrc <<'BASHRC'
+        cat > /root/.foreman_bashrc <<\BASHRC
         # Source system bashrc
         [ -f /etc/bashrc ] && . /etc/bashrc
         [ -f ~/.bashrc ] && . ~/.bashrc

@@ -72,6 +72,8 @@ spec:
         - redis-server
         - --port
         - "6379"
+        - --protected-mode
+        - "no"
         - --appendonly
         - "yes"
         - --dir

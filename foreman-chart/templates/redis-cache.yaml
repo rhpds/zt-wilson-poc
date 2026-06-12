@@ -53,6 +53,8 @@ spec:
         - redis-server
         - --port
         - "6379"
+        - --protected-mode
+        - "no"
         - --maxmemory
         - "256mb"
         - --maxmemory-policy

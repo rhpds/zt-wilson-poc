@@ -4,6 +4,8 @@ virtualmachines: []
 containers:
   - name: foreman-tools
     image: quay.io/foreman/foreman:3.13-stable
+    cpu: "250m"
+    memory: "1Gi"
     environment: {}
     command:
       - /bin/sh

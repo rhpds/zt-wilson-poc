@@ -5,6 +5,10 @@ containers:
   - name: foreman-tools
     image: quay.io/foreman/foreman-toolbox:latest
     environment: {}
+    command:
+      - /bin/sh
+      - -c
+      - sleep infinity
     ports:
       - 8080
     terminals:

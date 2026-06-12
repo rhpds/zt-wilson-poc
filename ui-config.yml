@@ -14,8 +14,8 @@ antora:
       label: "Tabs"
 
 tabs:
-  - name: "Redis Commander"
-    url: https://multi-test-${guid}.${domain}/
+  - name: "Foreman Web UI"
+    url: https://foreman-${guid}.${domain}/
   - name: "Asciidoc Doc"
     url: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
     external: true

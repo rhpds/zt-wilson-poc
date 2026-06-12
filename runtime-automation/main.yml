@@ -1,0 +1,12 @@
+---
+# Minimal runtime-automation playbook for Helm-only deployment
+# This deployment has no VMs (virtualmachines: [] in instances.yaml)
+# and solveButton: false (no solve/validation scripts needed)
+
+- name: Helm-only deployment placeholder
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Report no runtime automation needed
+      ansible.builtin.debug:
+        msg: "This is a Helm-only deployment with no VMs or solve scripts. No runtime automation tasks to execute."

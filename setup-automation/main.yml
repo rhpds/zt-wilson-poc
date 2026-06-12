@@ -1,0 +1,12 @@
+---
+# Minimal setup-automation playbook for Helm-only deployment
+# This deployment has no VMs (virtualmachines: [] in instances.yaml)
+# All infrastructure deployed via Helm charts, no post-boot VM configuration needed
+
+- name: Helm-only deployment placeholder
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Report no setup automation needed
+      ansible.builtin.debug:
+        msg: "This is a Helm-only deployment with no VMs. No VM setup tasks to execute."

@@ -1,4 +1,9 @@
 ---
-# Foreman deployment via Helm chart (no custom containers)
+# Foreman deployment via Helm chart
 virtualmachines: []
-containers: []
+containers:
+  - name: foreman-tooling
+    image: quay.io/foreman/foreman-toolbox:latest
+    terminals:
+      - name: foreman-cli
+        command: /bin/bash

@@ -12,7 +12,7 @@ tabs:
   - name: "Foreman Web UI"
     url: https://foreman-${guid}.${domain}/
   - name: "Foreman CLI"
-    url: /foreman-cli
+    url: /terminal_foreman-cli/
   - name: "Asciidoc Doc"
     url: https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/
     external: true

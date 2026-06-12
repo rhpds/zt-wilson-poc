@@ -2,7 +2,7 @@
 site:
   title: "Foreman on OpenShift with Helm"
   url: https://github.com/rhpds/zt-wilson-poc
-  start_page: modules::index.adoc
+  start_page: modules::module-01.adoc
 
 asciidoc:
   attributes:

@@ -79,7 +79,7 @@ charts:
     enabled: true
     source:
       type: path
-      path: /showroom/repo/helm-chart  # Local chart in content repo
+      path: helm-chart  # Local chart in content repo
 
     release:
       name: multi-test

@@ -904,8 +904,9 @@ You now understand how to deploy Foreman on OpenShift using custom Helm charts i
 * Foreman Documentation: https://theforeman.org/manuals/latest/
 * Helm Chart Best Practices: https://helm.sh/docs/chart_best_practices/
 * OpenShift NetworkPolicies: https://docs.openshift.com/container-platform/latest/networking/network_policy/about-network-policy.html
-* RHDP Platform Briefing: `~/Projects/cursor-revisit/ZEROTOUCH_BRIEFING.md`
-* AgnosticD Helm Workload: `ansible/roles_ocp_workloads/ocp4_workload_helm_from_content_repo/`
+* AgnosticD Documentation: https://redhat-cop.github.io/agnosticd/
+* AgnosticD GitHub Repository: https://github.com/redhat-cop/agnosticd
+* RHDP Showroom Deployer: https://github.com/rhpds/showroom-deployer
 
 == Conclusion
 

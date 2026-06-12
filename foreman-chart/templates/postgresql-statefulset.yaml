@@ -80,6 +80,9 @@ spec:
           value: {{ .Values.postgresql.database }}
         - name: PGDATA
           value: /var/lib/pgsql/data/pgdata
+        # Enable network connections (listen on all interfaces)
+        - name: POSTGRESQL_LISTEN_ADDRESSES
+          value: "*"
         volumeMounts:
         - name: postgresql-data
           mountPath: /var/lib/pgsql/data

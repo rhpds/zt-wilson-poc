@@ -89,13 +89,14 @@ spec:
           value: {{ .Values.rails.env }}
         - name: RAILS_MAX_THREADS
           value: {{ .Values.rails.maxThreads | quote }}
-        - name: DATABASE_URL
-          value: postgres://{{ .Values.postgresql.username }}:$(POSTGRES_PASSWORD)@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.database }}?pool={{ .Values.rails.maxThreads }}
+        # POSTGRES_PASSWORD must be defined before DATABASE_URL for variable expansion
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ .Release.Name }}-postgresql-secret
               key: password
+        - name: DATABASE_URL
+          value: postgres://{{ .Values.postgresql.username }}:$(POSTGRES_PASSWORD)@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.database }}?pool={{ .Values.rails.maxThreads }}
         - name: FOREMAN_RAILS_CACHE_STORE_TYPE
           value: redis
         - name: FOREMAN_RAILS_CACHE_STORE_URLS

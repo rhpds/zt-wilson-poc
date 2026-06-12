@@ -1,0 +1,190 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: foreman
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: app
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    targetPort: http
+    protocol: TCP
+  {{- if .Values.vnc.enabled }}
+  {{- range $port := untilStep (int .Values.vnc.startPort) (int (add1 .Values.vnc.endPort)) 1 }}
+  - name: vnc-{{ $port }}
+    port: {{ $port }}
+    targetPort: {{ $port }}
+    protocol: TCP
+  {{- end }}
+  {{- end }}
+  selector:
+    app.kubernetes.io/name: foreman
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: foreman
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: app
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Shared state with database
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: foreman
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: foreman
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: app
+    spec:
+      initContainers:
+      # Wait for PostgreSQL to be ready
+      - name: wait-postgres
+        image: {{ .Values.images.postgresql.repository }}:{{ .Values.images.postgresql.tag }}
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h {{ .Release.Name }}-postgresql -p 5432 -U {{ .Values.postgresql.username }}; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-postgresql-secret
+              key: password
+
+      # Initialize database (migrate and seed)
+      - name: db-init
+        image: {{ .Values.images.foreman.repository }}:{{ .Values.images.foreman.tag }}
+        command:
+        - sh
+        - -c
+        - |
+          echo "Running database migrations..."
+          bundle exec rake db:migrate
+          echo "Seeding database..."
+          bundle exec rake db:seed
+          echo "Resetting permissions..."
+          bundle exec rake permissions:reset password={{ .Values.foreman.adminPassword | default "changeme" }}
+          echo "Database initialization complete"
+        env: &foreman_env
+        - name: RAILS_ENV
+          value: {{ .Values.rails.env }}
+        - name: RAILS_MAX_THREADS
+          value: {{ .Values.rails.maxThreads | quote }}
+        - name: DATABASE_URL
+          value: postgres://{{ .Values.postgresql.username }}:$(POSTGRES_PASSWORD)@{{ .Release.Name }}-postgresql:5432/{{ .Values.postgresql.database }}?pool={{ .Values.rails.maxThreads }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-postgresql-secret
+              key: password
+        - name: FOREMAN_RAILS_CACHE_STORE_TYPE
+          value: redis
+        - name: FOREMAN_RAILS_CACHE_STORE_URLS
+          value: redis://{{ .Release.Name }}-redis-cache:6379/0
+        - name: DYNFLOW_REDIS_URL
+          value: redis://{{ .Release.Name }}-redis-tasks:6379/0
+        - name: REDIS_PROVIDER
+          value: DYNFLOW_REDIS_URL
+        - name: FOREMAN_FQDN
+          value: foreman-{{ .Values.guid }}.{{ .Values.domain }}
+        - name: FOREMAN_DOMAIN
+          value: {{ .Values.domain }}
+
+      containers:
+      # Foreman app (Rails web/API server)
+      - name: foreman-app
+        image: {{ .Values.images.foreman.repository }}:{{ .Values.images.foreman.tag }}
+        imagePullPolicy: {{ .Values.images.foreman.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        {{- if .Values.vnc.enabled }}
+        {{- range $port := untilStep (int .Values.vnc.startPort) (int (add1 .Values.vnc.endPort)) 1 }}
+        - containerPort: {{ $port }}
+          protocol: TCP
+        {{- end }}
+        {{- end }}
+        command:
+        - bundle
+        - exec
+        - bin/rails
+        - server
+        - -b
+        - "0.0.0.0"
+        env: *foreman_env
+        resources:
+          {{- toYaml .Values.foreman.app.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      # Orchestrator (Sidekiq - single-threaded coordinator)
+      - name: orchestrator
+        image: {{ .Values.images.foreman.repository }}:{{ .Values.images.foreman.tag }}
+        imagePullPolicy: {{ .Values.images.foreman.pullPolicy }}
+        command:
+        - bundle
+        - exec
+        - sidekiq
+        - -r
+        - ./extras/dynflow-sidekiq.rb
+        - -c
+        - {{ .Values.foreman.orchestrator.concurrency | quote }}
+        - -q
+        - dynflow_orchestrator
+        env: *foreman_env
+        resources:
+          {{- toYaml .Values.foreman.orchestrator.resources | nindent 10 }}
+
+      # Worker (Sidekiq - multi-threaded background jobs)
+      - name: worker
+        image: {{ .Values.images.foreman.repository }}:{{ .Values.images.foreman.tag }}
+        imagePullPolicy: {{ .Values.images.foreman.pullPolicy }}
+        command:
+        - bundle
+        - exec
+        - sidekiq
+        - -r
+        - ./extras/dynflow-sidekiq.rb
+        - -c
+        - {{ .Values.foreman.worker.concurrency | quote }}
+        - -q
+        - default,1
+        - -q
+        - remote_execution,1
+        env: *foreman_env
+        resources:
+          {{- toYaml .Values.foreman.worker.resources | nindent 10 }}

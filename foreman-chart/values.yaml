@@ -1,0 +1,113 @@
+# GUID and domain (provided by helm-charts.yaml)
+guid: ""
+domain: ""
+
+# Image configuration
+images:
+  foreman:
+    repository: quay.io/foreman/foreman
+    tag: "3.13-stable"
+    pullPolicy: IfNotPresent
+
+  postgresql:
+    repository: registry.redhat.io/rhel9/postgresql-16
+    tag: "1"
+    pullPolicy: IfNotPresent
+
+  redis:
+    repository: registry.redhat.io/rhel9/redis-7
+    tag: "1"
+    pullPolicy: IfNotPresent
+
+# Foreman configuration
+foreman:
+  # Admin user configuration
+  adminUser: admin
+  adminPassword: ""  # Auto-generated if empty
+  adminEmail: admin@example.com
+
+  # FQDN will be: foreman-{{ guid }}.{{ domain }}
+  # Domain defaults to apps domain from cluster
+
+  # Resource limits (per container)
+  app:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+
+  orchestrator:
+    concurrency: 1  # Single-threaded coordinator
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+  worker:
+    concurrency: 15  # Multi-threaded worker
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+# PostgreSQL configuration
+postgresql:
+  database: foreman
+  username: foreman
+  # Password auto-generated in secret
+
+  storage: 10Gi
+  storageClass: ""  # Empty uses default storage class
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# Redis configuration
+redis:
+  cache:
+    # Port 6379, in-memory only (no persistence)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  tasks:
+    # Port 6379, persistent queue with AOF
+    storage: 2Gi
+    storageClass: ""  # Empty uses default storage class
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Rails configuration
+rails:
+  env: production
+  maxThreads: 5  # From official docker-compose.yml
+
+# VNC configuration (for console access)
+vnc:
+  enabled: true
+  startPort: 5910
+  endPort: 5930

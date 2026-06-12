@@ -3,9 +3,43 @@
 # This file is read by ocp4_workload_helm_from_content_repo
 
 charts:
+  # Foreman lifecycle management platform
+  - name: foreman
+    enabled: true
+    source:
+      type: path
+      path: foreman-chart  # Custom chart in content repo
+
+    release:
+      name: foreman
+      values:
+        guid: "{{ guid }}"
+        domain: "{{ apps_domain }}"
+
+    security:
+      allowClusterScopedResources: false
+      allowPrivileged: false
+      allowHostPath: false
+      maxCpuLimit: 2000m       # Foreman app container limit
+      maxMemoryLimit: 4Gi      # Foreman app container limit
+      maxStorageClaim: 10Gi    # PostgreSQL PVC
+
+    wait:
+      enabled: true
+      timeout: 600  # 10 minutes for database initialization
+
+    routes:
+      - name: foreman
+        service: foreman
+        host: foreman
+        targetPort: http
+        tls: true
+        tls_termination: edge
+        remove_x_frame_options: true  # Allow Showroom iframe
+
   # Simple Redis deployment for testing
   - name: redis
-    enabled: true
+    enabled: false
     source:
       type: repository
       url: https://charts.bitnami.com/bitnami
@@ -76,7 +110,7 @@ charts:
 
   # Multi-container pod test - localhost communication
   - name: multi-container-test
-    enabled: true
+    enabled: false
     source:
       type: path
       path: helm-chart  # Local chart in content repo

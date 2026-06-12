@@ -108,7 +108,7 @@ spec:
         - name: FOREMAN_FQDN
           value: foreman-{{ .Values.guid }}.{{ .Values.domain }}
         - name: FOREMAN_DOMAIN
-          value: {{ .Values.domain }}
+          value: "{{ .Values.domain }}"
 
       containers:
       # Foreman app (Rails web/API server)

@@ -24,9 +24,7 @@ containers:
       - |
         # Configure hammer CLI on container startup
         mkdir -p /root/.hammer/cli.modules.d/
-
-        # Write hammer config with environment variable expansion
-        cat > /root/.hammer/cli.modules.d/foreman.yml <<CONFIGEOF
+        cat > /root/.hammer/cli.modules.d/foreman.yml <<EOF
         :foreman:
           :enable_module: true
           :host: '${FOREMAN_HOST}'
@@ -34,15 +32,12 @@ containers:
           :password: '${FOREMAN_PASSWORD}'
           :verify_ssl: false
           :request_timeout: 120
-        CONFIGEOF
+        EOF
 
         # Create custom bashrc for terminal
-        cat > /root/.foreman_bashrc <<\BASHRC
-        # Source system bashrc
+        cat > /root/.foreman_bashrc <<'EOF'
         [ -f /etc/bashrc ] && . /etc/bashrc
         [ -f ~/.bashrc ] && . ~/.bashrc
-
-        # Foreman CLI welcome message
         echo "==========================================="
         echo "  Foreman CLI - Hammer Tool"
         echo "==========================================="
@@ -53,11 +48,11 @@ containers:
         echo ""
         echo "Testing connection to Foreman..."
         if timeout 5 hammer ping &>/dev/null; then
-          echo "✓ Connected to Foreman API successfully"
+          echo "Connected to Foreman API successfully"
           hammer --version
         else
-          echo "⚠ Foreman API not ready yet (may still be initializing)"
-          echo "  Run 'hammer ping' to test connectivity"
+          echo "Foreman API not ready yet (may still be initializing)"
+          echo "Run hammer ping to test connectivity"
         fi
         echo ""
         echo "Common commands:"
@@ -67,7 +62,6 @@ containers:
         echo "  hammer --help               - Show all commands"
         echo "==========================================="
         echo ""
-        BASHRC
+        EOF
 
-        # Keep container running
         exec sleep infinity

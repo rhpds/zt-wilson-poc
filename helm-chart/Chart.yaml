@@ -1,0 +1,6 @@
+apiVersion: v2
+name: multi-container-test
+description: Multi-container pod test for localhost communication
+type: application
+version: 0.1.0
+appVersion: "1.0"

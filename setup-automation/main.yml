@@ -1,12 +1,179 @@
 ---
-# Minimal setup-automation playbook for Helm-only deployment
-# This deployment has no VMs (virtualmachines: [] in instances.yaml)
-# All infrastructure deployed via Helm charts, no post-boot VM configuration needed
+# Setup-automation for AAP operator integration
+# Configures AAP via REST API (no collections required)
+# See: /tmp/aap-execution-environment-collections-research.md
 
-- name: Helm-only deployment placeholder
+- name: Configure AAP for Lab
   hosts: localhost
+  connection: local
   gather_facts: false
+  vars:
+    controller_host: "{{ lookup('ansible.builtin.env', 'CONTROLLER_HOST') }}"
+    controller_username: "{{ lookup('ansible.builtin.env', 'CONTROLLER_USERNAME') }}"
+    controller_password: "{{ lookup('ansible.builtin.env', 'CONTROLLER_PASSWORD') }}"
+    bastion_password: "{{ lookup('ansible.builtin.env', 'BASTION_SSH_PASSWORD') }}"
+
   tasks:
-    - name: Report no setup automation needed
+    # =================================================================
+    # Wait for AAP to be ready
+    # =================================================================
+    - name: Wait for AAP API to be ready
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/ping/"
+        validate_certs: false
+      register: ping_result
+      until: ping_result.status == 200
+      retries: 30
+      delay: 10
+
+    # =================================================================
+    # Create Organization (required when create_preload_data: false)
+    # =================================================================
+    - name: Create Default organization
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/organizations/"
+        method: POST
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "Default"
+          description: "Default organization for lab"
+        status_code: [200, 201, 400]
+      register: org_create
+
+    - name: Get organization ID
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/organizations/?name=Default"
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+      register: org_result
+
+    - name: Set organization ID fact
+      ansible.builtin.set_fact:
+        org_id: "{{ org_result.json.results[0].id }}"
+
+    # =================================================================
+    # Create SSH Credential
+    # =================================================================
+    - name: Create Lab SSH Credential
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/credentials/"
+        method: POST
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "Lab SSH Credential"
+          description: "SSH credential for managed nodes"
+          credential_type: 1  # Machine credential type
+          organization: "{{ org_id }}"
+          inputs:
+            username: rhel
+            password: "{{ bastion_password }}"
+        status_code: [200, 201, 400]
+      register: cred_create
+
+    # =================================================================
+    # Create Inventory
+    # =================================================================
+    - name: Create Lab Inventory
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/inventories/"
+        method: POST
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "Lab Inventory"
+          description: "Inventory for lab managed nodes"
+          organization: "{{ org_id }}"
+        status_code: [200, 201, 400]
+      register: inv_create
+
+    - name: Get inventory ID
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/inventories/?name=Lab Inventory"
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+      register: inv_result
+
+    - name: Set inventory ID fact
+      ansible.builtin.set_fact:
+        inv_id: "{{ inv_result.json.results[0].id }}"
+
+    # =================================================================
+    # Create Inventory Hosts
+    # =================================================================
+    - name: Create inventory hosts
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/inventories/{{ inv_id }}/hosts/"
+        method: POST
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+          variables: "{{ item.variables | to_nice_yaml }}"
+        status_code: [200, 201, 400]
+      loop:
+        - name: rhel-web
+          variables:
+            ansible_host: rhel-web
+            ansible_user: rhel
+        - name: rhel-db
+          variables:
+            ansible_host: rhel-db
+            ansible_user: rhel
+      loop_control:
+        label: "{{ item.name }}"
+
+    # =================================================================
+    # Create Project (optional - for demo purposes)
+    # =================================================================
+    - name: Create Demo Project
+      ansible.builtin.uri:
+        url: "{{ controller_host }}/api/v2/projects/"
+        method: POST
+        user: "{{ controller_username }}"
+        password: "{{ controller_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: "Demo Project"
+          description: "Demo playbooks from ansible-examples"
+          organization: "{{ org_id }}"
+          scm_type: "git"
+          scm_url: "https://github.com/ansible/ansible-examples.git"
+          scm_branch: "master"
+          scm_update_on_launch: true
+        status_code: [200, 201, 400]
+      register: project_create
+
+    # =================================================================
+    # Report completion
+    # =================================================================
+    - name: Report setup complete
       ansible.builtin.debug:
-        msg: "This is a Helm-only deployment with no VMs. No VM setup tasks to execute."
+        msg: |
+          AAP configuration complete:
+          - Organization: Default (ID: {{ org_id }})
+          - Credential: Lab SSH Credential
+          - Inventory: Lab Inventory (ID: {{ inv_id }})
+          - Hosts: rhel-web, rhel-db
+          - Project: Demo Project
+
+          Students can now create job templates and run playbooks.

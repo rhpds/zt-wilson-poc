@@ -11,6 +11,10 @@ antora:
 tabs:
   - name: "Foreman Web UI"
     url: https://foreman-${guid}.${domain}/
+
+  - name: "Ansible Automation Platform"
+    url: https://aap-${guid}-sandbox-${guid}-zt-rhelbu.${domain}/
+
   # Future: Foreman CLI tab (requires custom container image with hammer-cli)
   # - name: "Foreman CLI"
   #   url: /foreman-cli

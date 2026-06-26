@@ -1,6 +1,42 @@
 ---
-# Foreman deployment via Helm chart (no VMs, only Helm-deployed infrastructure)
-virtualmachines: []
+# Managed nodes for AAP operator
+# Note: Using VMs (not containers) due to NetworkPolicy SSH restrictions
+# See: /tmp/aap-connectivity-test-phase1-results.md
+virtualmachines:
+  - name: rhel-web
+    image: rhel-9.5
+    memory: 8G
+    cores: 2
+    image_size: 10Gi
+    tags:
+    - key: "AnsibleGroup"
+      value: "isolated"
+    userdata: |-
+      #cloud-config
+      user: rhel
+      password: ansible123!
+      chpasswd: { expire: False }
+      runcmd:
+        - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/50-cloud-init.conf
+        - systemctl reload sshd
+
+  - name: rhel-db
+    image: rhel-9.5
+    memory: 8G
+    cores: 2
+    image_size: 10Gi
+    tags:
+    - key: "AnsibleGroup"
+      value: "isolated"
+    userdata: |-
+      #cloud-config
+      user: rhel
+      password: ansible123!
+      chpasswd: { expire: False }
+      runcmd:
+        - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/50-cloud-init.conf
+        - systemctl reload sshd
+
 containers: []
 
 # Future enhancement: Foreman CLI container with hammer

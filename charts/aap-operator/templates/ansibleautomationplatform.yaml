@@ -1,0 +1,196 @@
+---
+apiVersion: aap.ansible.com/v1alpha1
+kind: AnsibleAutomationPlatform
+metadata:
+  name: {{ .Values.instanceName }}
+  namespace: {{ include "aap-operator.namespace" . }}
+  labels:
+    {{- include "aap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: platform
+    {{- with .Values.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.additionalAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Platform-level configuration
+  image_pull_policy: {{ .Values.imagePullPolicy }}
+
+  {{- if or .Values.admin.password .Values.admin.existingSecret }}
+  # Admin password secret
+  admin_password_secret: {{ if .Values.admin.existingSecret }}{{ .Values.admin.existingSecret | quote }}{{ else }}{{ printf "%s-admin-password" .Values.instanceName | quote }}{{ end }}
+  {{- end }}
+
+  {{- if .Values.admin.username }}
+  admin_user: {{ .Values.admin.username | quote }}
+  {{- end }}
+
+  # Platform infrastructure components
+  api:
+    replicas: {{ .Values.platform.api.replicas }}
+    resource_requirements:
+      {{- toYaml .Values.platform.api.resources | nindent 6 }}
+
+  redis:
+    replicas: {{ .Values.platform.redis.replicas }}
+    resource_requirements:
+      {{- toYaml .Values.platform.redis.resources | nindent 6 }}
+
+  database:
+    {{- if .Values.database.externalDatabase.enabled }}
+    database_secret: {{ .Values.database.externalDatabase.secretName | quote }}
+    {{- else }}
+    resource_requirements:
+      {{- toYaml .Values.database.resources | nindent 6 }}
+    storage_requirements:
+      {{- toYaml .Values.database.storage | nindent 6 }}
+    {{- if .Values.database.storage.storageClass }}
+    storage_class: {{ .Values.database.storage.storageClass | quote }}
+    {{- end }}
+    {{- end }}
+
+  # Automation Controller
+  controller:
+    disabled: {{ not .Values.controller.enabled }}
+    {{- if .Values.controller.enabled }}
+    uwsgi_processes: {{ .Values.controller.uwsgiProcesses }}
+
+    {{- if .Values.controller.externalDatabase.enabled }}
+    postgres_configuration_secret: {{ .Values.controller.externalDatabase.secretName | quote }}
+    {{- end }}
+
+    task_resource_requirements:
+      {{- toYaml .Values.controller.resources.task | nindent 6 }}
+
+    web_resource_requirements:
+      {{- toYaml .Values.controller.resources.web | nindent 6 }}
+
+    ee_resource_requirements:
+      {{- toYaml .Values.controller.resources.ee | nindent 6 }}
+
+    redis_resource_requirements:
+      {{- toYaml .Values.controller.resources.redis | nindent 6 }}
+
+    rsyslog_resource_requirements:
+      {{- toYaml .Values.controller.resources.rsyslog | nindent 6 }}
+
+    init_container_resource_requirements:
+      {{- toYaml .Values.controller.resources.initContainer | nindent 6 }}
+    {{- end }}
+
+  # Automation Hub
+  hub:
+    disabled: {{ not .Values.hub.enabled }}
+    {{- if .Values.hub.enabled }}
+
+    # Storage configuration
+    storage_type: {{ .Values.hub.storage.type }}
+    {{- if eq .Values.hub.storage.type "file" }}
+    file_storage_storage_class: {{ .Values.hub.storage.file.storageClass | quote }}
+    file_storage_size: {{ .Values.hub.storage.file.size | quote }}
+    {{- else if eq .Values.hub.storage.type "S3" }}
+    object_storage_s3_secret: {{ .Values.hub.storage.s3.secretName | quote }}
+    {{- else if eq .Values.hub.storage.type "azure" }}
+    object_storage_azure_secret: {{ .Values.hub.storage.azure.secretName | quote }}
+    {{- end }}
+
+    {{- if .Values.hub.externalDatabase.enabled }}
+    postgres_configuration_secret: {{ .Values.hub.externalDatabase.secretName | quote }}
+    {{- end }}
+
+    # Resource requirements
+    api:
+      replicas: {{ .Values.hub.resources.api.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.hub.resources.api | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    content:
+      replicas: {{ .Values.hub.resources.content.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.hub.resources.content | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    worker:
+      replicas: {{ .Values.hub.resources.worker.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.hub.resources.worker | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    web:
+      replicas: {{ .Values.hub.resources.web.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.hub.resources.web | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    redis:
+      replicas: {{ .Values.hub.resources.redis.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.hub.resources.redis | nindent 8 | trimPrefix "        replicas: 1\n" }}
+    {{- end }}
+
+  # Event-Driven Ansible
+  eda:
+    disabled: {{ not .Values.eda.enabled }}
+    {{- if .Values.eda.enabled }}
+
+    {{- if .Values.eda.externalDatabase.enabled }}
+    postgres_configuration_secret: {{ .Values.eda.externalDatabase.secretName | quote }}
+    {{- end }}
+
+    # Resource requirements
+    api:
+      replicas: {{ .Values.eda.resources.api.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.api | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    ui:
+      replicas: {{ .Values.eda.resources.ui.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.ui | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    scheduler:
+      replicas: {{ .Values.eda.resources.scheduler.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.scheduler | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    worker:
+      replicas: {{ .Values.eda.resources.worker.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.worker | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    default_worker:
+      replicas: {{ .Values.eda.resources.defaultWorker.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.defaultWorker | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    activation_worker:
+      replicas: {{ .Values.eda.resources.activationWorker.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.activationWorker | nindent 8 | trimPrefix "        replicas: 1\n" }}
+
+    event_stream:
+      replicas: {{ .Values.eda.resources.eventStream.replicas }}
+      resource_requirements:
+        {{- toYaml .Values.eda.resources.eventStream | nindent 8 | trimPrefix "        replicas: 1\n" }}
+    {{- end }}
+
+  # Ansible Lightspeed
+  lightspeed:
+    disabled: {{ not .Values.lightspeed.enabled }}
+
+  {{- with .Values.nodeSelector }}
+  # Node selector for all pods
+  node_selector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.tolerations }}
+  # Tolerations for all pods
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.affinity }}
+  # Affinity rules for all pods
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

@@ -1,0 +1,23 @@
+apiVersion: v2
+name: aap-operator
+description: Helm chart for deploying Ansible Automation Platform 2.7 Operator on OpenShift
+type: application
+version: 0.1.0
+appVersion: "2.7.0"
+keywords:
+  - ansible
+  - automation
+  - aap
+  - operator
+  - openshift
+home: https://github.com/rhpds/zt-wilson-poc
+sources:
+  - https://github.com/rhpds/zt-wilson-poc
+maintainers:
+  - name: RHDP Zerotouch Team
+    email: rhdp-dev@redhat.com
+annotations:
+  # OpenShift-specific annotations
+  "openshift.io/display-name": "Ansible Automation Platform Operator"
+  "openshift.io/provider-display-name": "Red Hat Demo Platform"
+  "openshift.io/description": "Deploys AAP 2.7 operator and creates configured AnsibleAutomationPlatform instance"

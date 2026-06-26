@@ -1,0 +1,362 @@
+# Default values for aap-operator Helm chart
+# This chart deploys Ansible Automation Platform 2.7 Operator and creates an AnsibleAutomationPlatform instance
+
+# =============================================================================
+# Namespace and Operator Configuration
+# =============================================================================
+
+# Target namespace for AAP deployment
+# Default: use the Helm release namespace
+# Important: Cannot use "default" namespace - must be dedicated
+namespace: ""
+
+# Operator subscription configuration
+operator:
+  # Operator channel - stable-2.7 for AAP 2.7
+  channel: "stable-2.7"
+
+  # Starting CSV for initial installation
+  # Leave empty to install latest from channel
+  # Set explicitly to avoid OLM upgrade path issues
+  startingCSV: "aap-operator.v2.7.0-0.1781768237"
+
+  # Install plan approval mode
+  # Automatic: operator upgrades applied automatically
+  # Manual: require manual approval for upgrades
+  installPlanApproval: "Automatic"
+
+  # Operator source
+  source: "redhat-operators"
+  sourceNamespace: "openshift-marketplace"
+
+# =============================================================================
+# AAP Instance Configuration
+# =============================================================================
+
+# Name of the AnsibleAutomationPlatform CR
+# This becomes the base name for all AAP components
+instanceName: "aap"
+
+# Admin user configuration
+admin:
+  # Admin username - default is 'admin'
+  username: "admin"
+
+  # Admin password
+  # If not set, operator generates a random password
+  # Recommended: set explicitly for predictable access
+  password: ""
+
+  # Existing secret name for admin password
+  # If set, chart will not create a secret
+  # Secret must exist in target namespace with key 'password'
+  existingSecret: ""
+
+# Image pull policy for all AAP components
+# IfNotPresent: pull only if image not present locally
+# Always: always pull latest image
+imagePullPolicy: "IfNotPresent"
+
+# =============================================================================
+# Component Configuration
+# =============================================================================
+
+# Automation Controller (AWX-based control plane)
+controller:
+  # Enable/disable controller deployment
+  enabled: true
+
+  # Number of uWSGI processes for controller web
+  uwsgiProcesses: 2
+
+  # External database configuration (optional)
+  # If not set, operator creates a managed PostgreSQL instance
+  externalDatabase:
+    enabled: false
+    # Secret name containing database credentials
+    # Secret format documented in charts/aap-operator/README.md
+    secretName: ""
+
+  # Resource requirements for controller components
+  # Values from Red Hat documentation (AAP 2.7)
+  resources:
+    task:
+      requests:
+        cpu: "100m"
+        memory: "150Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1200Mi"
+
+    web:
+      requests:
+        cpu: "100m"
+        memory: "200Mi"
+      limits:
+        cpu: "200m"
+        memory: "1600Mi"
+
+    ee:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+      limits:
+        cpu: "1000m"
+        memory: "500Mi"
+
+    redis:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "100m"
+        memory: "200Mi"
+
+    rsyslog:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "250Mi"
+
+    initContainer:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "200Mi"
+
+# Automation Hub (private automation hub for content)
+hub:
+  # Enable/disable hub deployment
+  enabled: false
+
+  # Storage configuration for Hub content
+  # Required when hub is enabled
+  storage:
+    # Storage type: file | S3 | azure
+    type: "file"
+
+    # File storage configuration (when type: file)
+    file:
+      # Storage class for RWX volume
+      # Must be RWX (ReadWriteMany) capable
+      # Example: nfs-local-rwx, ocs-storagecluster-cephfs
+      storageClass: ""
+      size: "50Gi"
+
+    # S3 storage configuration (when type: S3)
+    s3:
+      # Secret name containing S3 credentials
+      secretName: ""
+
+    # Azure storage configuration (when type: azure)
+    azure:
+      # Secret name containing Azure credentials
+      secretName: ""
+
+  # External database configuration (optional)
+  externalDatabase:
+    enabled: false
+    secretName: ""
+
+  # Resource requirements for hub components
+  resources:
+    api:
+      replicas: 1
+      requests:
+        cpu: "150m"
+        memory: "256Mi"
+      limits:
+        cpu: "800m"
+        memory: "500Mi"
+
+    content:
+      replicas: 1
+      requests:
+        cpu: "150m"
+        memory: "256Mi"
+      limits:
+        cpu: "800m"
+        memory: "1200Mi"
+
+    worker:
+      replicas: 1
+      requests:
+        cpu: "150m"
+        memory: "256Mi"
+      limits:
+        cpu: "800m"
+        memory: "400Mi"
+
+    web:
+      replicas: 1
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "300Mi"
+
+    redis:
+      replicas: 1
+      requests:
+        cpu: "100m"
+        memory: "250Mi"
+      limits:
+        cpu: "300m"
+        memory: "400Mi"
+
+# Event-Driven Ansible (EDA)
+eda:
+  # Enable/disable EDA deployment
+  enabled: false
+
+  # External database configuration (optional)
+  externalDatabase:
+    enabled: false
+    secretName: ""
+
+  # Resource requirements for EDA components
+  resources:
+    api:
+      replicas: 1
+      requests:
+        cpu: "50m"
+        memory: "350Mi"
+      limits:
+        cpu: "500m"
+        memory: "400Mi"
+
+    ui:
+      replicas: 1
+      requests:
+        cpu: "25m"
+        memory: "64Mi"
+      limits:
+        cpu: "500m"
+        memory: "150Mi"
+
+    scheduler:
+      replicas: 1
+      requests:
+        cpu: "50m"
+        memory: "200Mi"
+      limits:
+        cpu: "500m"
+        memory: "250Mi"
+
+    worker:
+      replicas: 2
+      requests:
+        cpu: "25m"
+        memory: "200Mi"
+      limits:
+        cpu: "250m"
+        memory: "250Mi"
+
+    defaultWorker:
+      replicas: 1
+      requests:
+        cpu: "25m"
+        memory: "200Mi"
+      limits:
+        cpu: "500m"
+        memory: "400Mi"
+
+    activationWorker:
+      replicas: 1
+      requests:
+        cpu: "25m"
+        memory: "150Mi"
+      limits:
+        cpu: "500m"
+        memory: "400Mi"
+
+    eventStream:
+      replicas: 1
+      requests:
+        cpu: "25m"
+        memory: "150Mi"
+      limits:
+        cpu: "100m"
+        memory: "300Mi"
+
+# Ansible Lightspeed (AI-powered content recommendations)
+lightspeed:
+  # Enable/disable Lightspeed deployment
+  # Note: Requires additional subscription and configuration
+  enabled: false
+
+# =============================================================================
+# Platform Infrastructure
+# =============================================================================
+
+# Platform gateway (unified entry point for all AAP components)
+platform:
+  api:
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "1000Mi"
+
+  redis:
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "500Mi"
+
+# Shared platform database
+# Used by platform gateway for unified authentication
+database:
+  # External database configuration (optional)
+  externalDatabase:
+    enabled: false
+    secretName: ""
+
+  # Resource requirements for managed database
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "800Mi"
+
+  # Storage requirements for managed database
+  storage:
+    requests:
+      storage: "100Gi"
+    # Storage class for database PVC
+    # If empty, uses cluster default
+    storageClass: ""
+
+# =============================================================================
+# Advanced Configuration
+# =============================================================================
+
+# Additional labels to apply to all resources
+additionalLabels: {}
+
+# Additional annotations to apply to all resources
+additionalAnnotations: {}
+
+# Node selector for all AAP pods
+# Example: { "node-role.kubernetes.io/worker": "" }
+nodeSelector: {}
+
+# Tolerations for all AAP pods
+tolerations: []
+
+# Affinity rules for all AAP pods
+affinity: {}

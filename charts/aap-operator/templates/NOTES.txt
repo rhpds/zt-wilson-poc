@@ -1,0 +1,73 @@
+Ansible Automation Platform 2.7 Operator deployed successfully!
+
+Components deployed:
+{{- if .Values.controller.enabled }}
+  ✓ Automation Controller (AWX)
+{{- end }}
+{{- if .Values.hub.enabled }}
+  ✓ Private Automation Hub
+{{- end }}
+{{- if .Values.eda.enabled }}
+  ✓ Event-Driven Ansible
+{{- end }}
+{{- if .Values.lightspeed.enabled }}
+  ✓ Ansible Lightspeed
+{{- end }}
+
+Namespace: {{ include "aap-operator.namespace" . }}
+Instance Name: {{ .Values.instanceName }}
+
+=============================================================================
+NEXT STEPS:
+=============================================================================
+
+1. Wait for operator installation (2-5 minutes):
+
+   oc get csv -n {{ include "aap-operator.namespace" . }}
+
+   Wait until PHASE shows "Succeeded"
+
+2. Monitor AAP instance creation (5-15 minutes):
+
+   oc get ansibleautomationplatform {{ .Values.instanceName }} -n {{ include "aap-operator.namespace" . }}
+
+   Watch pods come online:
+   oc get pods -n {{ include "aap-operator.namespace" . }} -w
+
+3. Get platform gateway URL:
+
+   oc get route -n {{ include "aap-operator.namespace" . }} | grep gateway
+
+4. Access credentials:
+
+   Username: {{ .Values.admin.username }}
+   {{- if .Values.admin.password }}
+   Password: (set in values)
+   {{- else if .Values.admin.existingSecret }}
+   Password: (from secret {{ .Values.admin.existingSecret }})
+   {{- else }}
+   Password: (auto-generated, retrieve with command below)
+
+   oc get secret {{ .Values.instanceName }}-admin-password \
+     -n {{ include "aap-operator.namespace" . }} \
+     -o jsonpath='{.data.password}' | base64 -d
+   {{- end }}
+
+=============================================================================
+TROUBLESHOOTING:
+=============================================================================
+
+Check operator logs:
+  oc logs -n {{ include "aap-operator.namespace" . }} \
+    -l app.kubernetes.io/name=aap-operator
+
+Check platform status:
+  oc describe ansibleautomationplatform {{ .Values.instanceName }} \
+    -n {{ include "aap-operator.namespace" . }}
+
+Check events:
+  oc get events -n {{ include "aap-operator.namespace" . }} \
+    --sort-by='.lastTimestamp' | tail -20
+
+For more information:
+  https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7

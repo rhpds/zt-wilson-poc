@@ -23,8 +23,12 @@ spec:
   admin_password_secret: {{ if .Values.admin.existingSecret }}{{ .Values.admin.existingSecret | quote }}{{ else }}{{ printf "%s-admin-password" .Values.instanceName | quote }}{{ end }}
   {{- end }}
 
-  {{- if .Values.admin.username }}
-  admin_user: {{ .Values.admin.username | quote }}
+  {{- if .Values.route_annotations }}
+  # Route annotations for timeout and other HAProxy settings
+  route_annotations: |
+    {{- range $key, $value := .Values.route_annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
   {{- end }}
 
   # Platform infrastructure components
@@ -45,9 +49,10 @@ spec:
     resource_requirements:
       {{- toYaml .Values.database.resources | nindent 6 }}
     storage_requirements:
-      {{- toYaml .Values.database.storage | nindent 6 }}
+      requests:
+        storage: {{ .Values.database.storage.requests.storage | quote }}
     {{- if .Values.database.storage.storageClass }}
-    storage_class: {{ .Values.database.storage.storageClass | quote }}
+    postgres_storage_class: {{ .Values.database.storage.storageClass | quote }}
     {{- end }}
     {{- end }}
 

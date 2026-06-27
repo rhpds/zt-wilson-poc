@@ -12,6 +12,11 @@ namespace: ""
 
 # Operator subscription configuration
 operator:
+  # Install operator (OperatorGroup + Subscription)
+  # Set to false if operator is already installed by cluster admin
+  # When false, only AAP instance CR is deployed
+  install: true
+
   # Operator channel - stable-2.7 for AAP 2.7
   channel: "stable-2.7"
 
@@ -56,6 +61,21 @@ admin:
 # IfNotPresent: pull only if image not present locally
 # Always: always pull latest image
 imagePullPolicy: "IfNotPresent"
+
+# Route annotations for OpenShift routes
+# Used to configure HAProxy timeout and other route-level settings
+# The operator propagates these to all component routes
+# Reference: https://access.redhat.com/solutions/7141796
+#
+# Example - Increase timeout to prevent uWSGI HARAKIRI on discovery endpoints:
+#   route_annotations:
+#     haproxy.router.openshift.io/timeout: "300s"
+#
+# With timeout: 300s, the cascade becomes:
+#   HAProxy: 300s, Envoy: 150s, Nginx: 150s, uWSGI harakiri: 100s
+# Default (30s) gives only 10s for uWSGI workers before HARAKIRI kill
+route_annotations: {}
+  # haproxy.router.openshift.io/timeout: "300s"
 
 # =============================================================================
 # Component Configuration

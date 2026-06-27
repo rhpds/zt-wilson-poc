@@ -1,3 +1,4 @@
+{{- if .Values.operator.install }}
 ---
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -16,3 +17,4 @@ metadata:
 spec:
   targetNamespaces:
     - {{ include "aap-operator.namespace" . }}
+{{- end }}

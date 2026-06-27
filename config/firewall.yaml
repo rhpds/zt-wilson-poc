@@ -1,10 +1,10 @@
 ---
-# NetworkPolicy configuration for Foreman deployment
+# NetworkPolicy configuration for AAP deployment
 # Defines allowed ingress (incoming) and egress (outgoing) traffic
 
-# Ingress: Allow incoming connections to Foreman services
+# Ingress: Allow incoming connections to AAP services
 ingress:
-  # Allow HTTP/HTTPS traffic from anywhere (for Foreman web UI access)
+  # Allow HTTP/HTTPS traffic from anywhere (for AAP web UI access)
   - from:
       - ipBlock:
           cidr: 0.0.0.0/0
@@ -14,11 +14,9 @@ ingress:
       - protocol: TCP
         port: 443
       - protocol: TCP
-        port: 3000  # Foreman Rails server
-      - protocol: TCP
         port: 8080
 
-  # Allow database connections within namespace (Foreman pods → PostgreSQL/Redis)
+  # Allow database connections within namespace (AAP pods → PostgreSQL/Redis)
   - from:
       - podSelector: {}  # Any pod in this namespace
     ports:
@@ -26,16 +24,6 @@ ingress:
         port: 5432  # PostgreSQL
       - protocol: TCP
         port: 6379  # Redis
-
-  # Allow VNC connections for console access (if enabled)
-  - from:
-      - ipBlock:
-          cidr: 0.0.0.0/0
-    ports:
-      - protocol: TCP
-        port: 5910
-      - protocol: TCP
-        port: 5930
 
 # Egress: Allow outgoing connections from pods
 egress:
@@ -60,12 +48,17 @@ egress:
       - protocol: TCP
         port: 6379
 
-  # Foreman app connections within namespace (for hammer CLI in terminal)
-  - ports:
+  # CRITICAL: Kubernetes API access for operator pods
+  # Without this, operator reconciliation fails with connection timeouts
+  # Operator needs to query CRDs, create resources, watch events
+  - to:
+      - ipBlock:
+          cidr: 0.0.0.0/0
+    ports:
       - protocol: TCP
-        port: 3000
+        port: 6443  # Kubernetes API server
 
-  # HTTPS for external connections (package downloads, etc.)
+  # HTTPS for external connections (package downloads, container registries, etc.)
   - ports:
       - protocol: TCP
         port: 443

@@ -3,38 +3,48 @@
 # This file is read by ocp4_workload_helm_from_content_repo
 
 charts:
-  # Foreman lifecycle management platform
-  - name: foreman
+  # Ansible Automation Platform 2.7
+  - name: aap
     enabled: true
     source:
       type: path
-      path: foreman-chart  # Custom chart in content repo
+      path: charts/aap-operator  # AAP Helm chart in content repo
 
     release:
-      name: foreman
+      name: aap
       values:
-        guid: "{{ guid }}"
-        domain: "{{ apps_domain }}"
-        foreman:
-          adminPassword: "{{ common_password }}"
+        # Operator already installed by ocp4_workload_install_operator
+        operator:
+          install: false
+
+        # Admin credentials
+        admin:
+          password: "{{ common_password }}"
+
+        # Component configuration
+        controller:
+          enabled: true
+        hub:
+          enabled: false
+        eda:
+          enabled: false
+        lightspeed:
+          enabled: false
+
+        # Critical timeout fix for gateway initialization
+        # Prevents uWSGI HARAKIRI timeout on discovery endpoints
+        # Reference: Red Hat Solution 7141796
+        route_annotations:
+          haproxy.router.openshift.io/timeout: "300s"
 
     security:
-      allowClusterScopedResources: false
-      allowPrivileged: false
-      allowHostPath: false
-      maxCpuLimit: 2000m       # Foreman app container limit
-      maxMemoryLimit: 4Gi      # Foreman app container limit
-      maxStorageClaim: 10Gi    # PostgreSQL PVC
+      allowClusterScopedResources: false  # No cluster-wide resources
+      allowPrivileged: false              # No privileged containers
+      allowHostPath: false                # No host path volumes
+      maxCpuLimit: 2000m                  # Controller web/task pod limit
+      maxMemoryLimit: 4Gi                 # Controller web/task pod limit
+      maxStorageClaim: 10Gi               # PostgreSQL PVC
 
     wait:
       enabled: true
-      timeout: 600  # 10 minutes for database initialization
-
-    routes:
-      - name: foreman
-        service: foreman
-        host: foreman
-        targetPort: http
-        tls: true
-        tls_termination: edge
-        remove_x_frame_options: true  # Allow Showroom iframe
+      timeout: 900  # 15 minutes for operator reconciliation + migrations

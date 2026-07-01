@@ -13,13 +13,6 @@ charts:
     release:
       name: aap
       values:
-        # Operator already installed by ocp4_workload_install_operator
-        # CRITICAL: Must be false. Setting to true causes race condition where
-        # operator tries to use gateway API before it's ready (Test 6 failure).
-        # Two-step deployment (operator → instance) is required.
-        operator:
-          install: false
-
         # Admin credentials
         admin:
           password: "{{ common_password }}"

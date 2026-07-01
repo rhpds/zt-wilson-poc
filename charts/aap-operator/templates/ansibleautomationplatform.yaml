@@ -23,6 +23,11 @@ spec:
   admin_password_secret: {{ if .Values.admin.existingSecret }}{{ .Values.admin.existingSecret | quote }}{{ else }}{{ printf "%s-admin-password" .Values.instanceName | quote }}{{ end }}
   {{- end }}
 
+  {{- if .Values.route_host }}
+  # Custom route hostname (overrides operator default)
+  route_host: {{ .Values.route_host | quote }}
+  {{- end }}
+
   {{- if .Values.route_annotations }}
   # Route annotations for timeout and other HAProxy settings
   route_annotations: |

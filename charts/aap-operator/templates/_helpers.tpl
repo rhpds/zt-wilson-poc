@@ -54,3 +54,14 @@ Namespace
 {{- define "aap-operator.namespace" -}}
 {{- .Values.namespace | default .Release.Namespace }}
 {{- end }}
+
+{{/*
+Service Account Name
+*/}}
+{{- define "aap-operator.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "aap-operator.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}

@@ -2,6 +2,9 @@
 # Minimal setup-automation playbook for Helm-only deployment
 # This deployment has no VMs (virtualmachines: [] in instances.yaml)
 # All infrastructure deployed via Helm charts, no post-boot VM configuration needed
+#
+# NOTE: AAP route iframe configuration (X-Frame-Options removal) is handled
+# by the Helm chart's post-install hook (route-patch-job.yaml)
 
 - name: Helm-only deployment placeholder
   hosts: localhost
@@ -9,4 +12,4 @@
   tasks:
     - name: Report no setup automation needed
       ansible.builtin.debug:
-        msg: "This is a Helm-only deployment with no VMs. No VM setup tasks to execute."
+        msg: "This is a Helm-only deployment with no VMs. AAP route patching handled by Helm chart."

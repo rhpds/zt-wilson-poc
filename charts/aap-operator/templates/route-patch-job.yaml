@@ -1,0 +1,83 @@
+{{- if .Values.showroom.iframeIntegration.enabled }}
+---
+# Job to patch AAP route for iframe embedding in Showroom
+# Removes X-Frame-Options header to allow the AAP UI to be embedded
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "aap-operator.fullname" . }}-route-patch
+  labels:
+    {{- include "aap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: route-patch
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        {{- include "aap-operator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: route-patch
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "aap-operator.serviceAccountName" . }}
+      containers:
+        - name: patch-route
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "Waiting for AAP route to be created..."
+
+              # Wait up to 5 minutes for route to exist
+              for i in {1..30}; do
+                if oc get route {{ .Values.aap.name }} -n {{ .Release.Namespace }} &>/dev/null; then
+                  echo "AAP route found"
+                  break
+                fi
+                echo "Waiting for route... attempt $i/30"
+                sleep 10
+              done
+
+              # Verify route exists
+              if ! oc get route {{ .Values.aap.name }} -n {{ .Release.Namespace }} &>/dev/null; then
+                echo "ERROR: AAP route not found after 5 minutes"
+                exit 1
+              fi
+
+              # Patch route to remove X-Frame-Options header
+              echo "Patching AAP route to remove X-Frame-Options header..."
+              oc patch route {{ .Values.aap.name }} -n {{ .Release.Namespace }} --type=json -p='[
+                {
+                  "op": "add",
+                  "path": "/spec/httpHeaders",
+                  "value": {
+                    "actions": {
+                      "response": [
+                        {
+                          "name": "X-Frame-Options",
+                          "action": {
+                            "type": "Delete"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]'
+
+              echo "Route patch completed successfully"
+              echo "AAP web UI can now be embedded in Showroom iframes"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+{{- end }}

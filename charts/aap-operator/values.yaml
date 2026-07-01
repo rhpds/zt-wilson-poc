@@ -360,3 +360,29 @@ tolerations: []
 
 # Affinity rules for all AAP pods
 affinity: {}
+
+# =============================================================================
+# Service Account and RBAC
+# =============================================================================
+
+serviceAccount:
+  # Create a ServiceAccount for Helm jobs (route patching, etc.)
+  create: true
+
+  # ServiceAccount name (auto-generated if not set)
+  name: ""
+
+  # Annotations to add to the ServiceAccount
+  annotations: {}
+
+# =============================================================================
+# Showroom Integration
+# =============================================================================
+
+# Configuration for embedding AAP in RHDP Zerotouch Showroom labs
+showroom:
+  iframeIntegration:
+    # Enable automatic route patching for iframe embedding
+    # When enabled, removes X-Frame-Options header from AAP route
+    # This allows the AAP web UI to be embedded in Showroom tabs
+    enabled: true

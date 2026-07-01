@@ -1,0 +1,19 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "aap-operator.fullname" . }}
+  namespace: {{ include "aap-operator.namespace" . }}
+  labels:
+    {{- include "aap-operator.labels" . | nindent 4 }}
+rules:
+  # Allow reading and patching routes for iframe integration
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - get
+      - list
+      - patch
+{{- end }}

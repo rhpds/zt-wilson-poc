@@ -9,8 +9,11 @@ antora:
       solveButton: false
 
 tabs:
-  - name: "Foreman Web UI"
-    url: https://foreman-${guid}.${domain}/
+  - name: "AAP Web UI"
+    url: http://aap.sandbox-${guid}-zt-rhelbu.svc/
+  # Future: Foreman Web UI tab (placeholder from template)
+  # - name: "Foreman Web UI"
+  #   url: https://foreman-${guid}.${domain}/
   # Future: Foreman CLI tab (requires custom container image with hammer-cli)
   # - name: "Foreman CLI"
   #   url: /foreman-cli

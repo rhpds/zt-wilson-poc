@@ -1,56 +1,78 @@
 ---
-# NetworkPolicy configuration for AAP deployment
-# Defines allowed ingress (incoming) and egress (outgoing) traffic
+# Additional NetworkPolicy rules for AAP 2.7 deployment
+# These rules are APPENDED to default_ingress_rules and default_egress_rules
+# from zero-touch-base-rhel/default_vars_openshift_cnv.yaml
+#
+# Base rules already provide:
+#   Ingress: HTTP/HTTPS/8080 from anywhere, SSH from Showroom
+#   Egress: DNS, SSH to VMs, ports 7171/8081/9000
+#
+# AAP-specific additions below:
 
-# Ingress: Allow incoming connections to AAP services
+# Ingress rules (zero_touch_ingress_lockdown_rules)
 ingress:
-  # Allow HTTP/HTTPS traffic from anywhere (for AAP web UI access)
+  # AAP Gateway - Allow OpenShift router to reach AAP web UI
+  # OpenShift Routes require ingress from the router namespace
   - from:
-      - ipBlock:
-          cidr: 0.0.0.0/0
+      - namespaceSelector:
+          matchLabels:
+            network.openshift.io/policy-group: ingress  # OpenShift router
     ports:
       - protocol: TCP
-        port: 80
-      - protocol: TCP
-        port: 443
-      - protocol: TCP
-        port: 8080
+        port: 8000  # AAP gateway pod targetPort
 
-  # Allow database connections within namespace (AAP pods → PostgreSQL/Redis)
+  # PostgreSQL/Redis - Allow AAP operator to initialize databases
+  # Operator runs in ansible-automation-platform namespace (cluster-scoped)
   - from:
-      - podSelector: {}  # Any pod in this namespace
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: ansible-automation-platform
     ports:
       - protocol: TCP
         port: 5432  # PostgreSQL
       - protocol: TCP
         port: 6379  # Redis
 
-# Egress: Allow outgoing connections from pods
-egress:
-  # DNS for service discovery
-  - to:
-      - namespaceSelector:
+  # PostgreSQL/Redis - Allow AAP pods to access databases
+  # AAP components (controller, hub, eda) need database connectivity
+  - from:
+      - podSelector:
           matchLabels:
-            kubernetes.io/metadata.name: openshift-dns
+            app.kubernetes.io/part-of: aap
     ports:
-      - protocol: UDP
-        port: 5353
       - protocol: TCP
-        port: 5353
-
-  # PostgreSQL database connections within namespace
-  - ports:
+        port: 5432  # PostgreSQL
       - protocol: TCP
-        port: 5432
+        port: 6379  # Redis
 
-  # Redis connections within namespace
-  - ports:
+# Egress rules (zero_touch_egress_lockdown_rules)
+egress:
+  # PostgreSQL/Redis - Allow AAP pods to reach their databases
+  - to:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/part-of: aap
+    ports:
       - protocol: TCP
-        port: 6379
+        port: 5432  # PostgreSQL
+      - protocol: TCP
+        port: 6379  # Redis
 
-  # CRITICAL: Kubernetes API access for operator pods
-  # Without this, operator reconciliation fails with connection timeouts
-  # Operator needs to query CRDs, create resources, watch events
+  # AAP Gateway - Allow AAP components to communicate with gateway
+  # Controller/Hub/EDA use gateway for auth and API routing
+  - to:
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/component: aap-gateway
+    ports:
+      - protocol: TCP
+        port: 8000  # Gateway pod targetPort
+      - protocol: TCP
+        port: 80    # Gateway service port
+
+  # Kubernetes API - Required for AAP operator reconciliation
+  # Operator needs to read CRDs, create resources, watch events
+  # Using 0.0.0.0/0 because API server endpoint varies by cluster
   - to:
       - ipBlock:
           cidr: 0.0.0.0/0
@@ -58,12 +80,25 @@ egress:
       - protocol: TCP
         port: 6443  # Kubernetes API server
 
-  # HTTPS for external connections (package downloads, container registries, etc.)
+  # HTTPS - Required for external integrations
+  # AAP needs to reach: Red Hat registries, package repos, external APIs
+  # PRODUCTION NOTE: The base rules already include port 443 egress,
+  # but this is explicitly listed for AAP-specific use cases:
+  #   - Container image pulls (registry.redhat.io, quay.io)
+  #   - Package updates (cdn.redhat.com)
+  #   - External automation targets (if configured in playbooks)
+  # Consider restricting to specific IP ranges for production
   - ports:
       - protocol: TCP
         port: 443
 
-  # HTTP for external connections (if needed)
+  # HTTP - Required for non-TLS endpoints
+  # AAP may need HTTP for:
+  #   - Legacy automation targets
+  #   - Internal pod-to-pod communication (port 8000)
+  # PRODUCTION NOTE: Consider removing if all external services use HTTPS
   - ports:
       - protocol: TCP
         port: 80
+      - protocol: TCP
+        port: 8000  # AAP gateway pod port

@@ -10,7 +10,7 @@ antora:
 
 tabs:
   - name: "AAP Web UI"
-    url: http://aap.sandbox-${guid}-zt-rhelbu.svc/
+    url: https://aap-sandbox-${guid}-zt-rhelbu.${domain}/
   # Future: Foreman Web UI tab (placeholder from template)
   # - name: "Foreman Web UI"
   #   url: https://foreman-${guid}.${domain}/

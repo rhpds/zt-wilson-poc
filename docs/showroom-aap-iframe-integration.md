@@ -127,7 +127,16 @@ tabs:
 | `external` | `false` | Embeds as iframe (not new tab) |
 | `${guid}` | Variable substitution | Replaced by `envsubst` during Showroom pod startup |
 
-**Domain mismatch issue**: The `${domain}` variable in Showroom expands to `apps.ocpvdev01.rhdp.net` but AAP route uses `apps.ocpvdev01.dal13.infra.demo.redhat.com`. **Solution**: Hardcode the full route hostname.
+**Domain mismatch issue**: The `${domain}` variable in Showroom expands to `apps.ocpvdev01.rhdp.net` but AAP operator defaults to the cluster's route domain (`apps.ocpvdev01.dal13.infra.demo.redhat.com`). 
+
+**Solution**: Set `route_host` in AAP chart to match Showroom's domain:
+
+```yaml
+# charts/aap-operator/values.yaml or --set flag
+route_host: "aap-sandbox-${guid}-zt-rhelbu.apps.ocpvdev01.rhdp.net"
+```
+
+**Alternative**: Hardcode the full hostname in ui-config.yml if you cannot control AAP deployment.
 
 ---
 
@@ -142,15 +151,20 @@ showroom:
     enabled: true  # Set to false to skip route patching
 ```
 
-### Deploy AAP chart
+### Deploy AAP chart with route_host
+
+**Recommended**: Set `route_host` to match Showroom's `${domain}` variable:
 
 ```bash
 helm template aap charts/aap-operator/ \
   --set admin.password=<password> \
+  --set route_host="aap-sandbox-<guid>-zt-rhelbu.apps.ocpvdev01.rhdp.net" \
   | oc apply -f -
 ```
 
-The post-install hook will automatically patch the route.
+The post-install hook will automatically patch the route to enable iframe embedding.
+
+**See**: `docs/DEPLOYMENT.md` for detailed deployment options.
 
 ---
 

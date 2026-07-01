@@ -18,6 +18,26 @@ This chart deploys:
 - Namespace admin permissions for target namespace
 - Helm 3.10+ (for rendering templates)
 
+## Showroom Integration
+
+This chart includes **automatic iframe integration** for RHDP Zerotouch Showroom labs.
+
+**What it does:**
+- Removes X-Frame-Options header from AAP route (allows iframe embedding)
+- Uses namespace-scoped RBAC (works in Babylon sandboxes)
+- Runs as Helm post-install hook (automatic, idempotent)
+
+**Enable/disable:**
+```yaml
+showroom:
+  iframeIntegration:
+    enabled: true  # Default: true
+```
+
+**Complete guide:** See `docs/showroom-aap-iframe-integration.md`
+
+---
+
 ## Quick Start
 
 ### 1. Install with default configuration

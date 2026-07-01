@@ -10,29 +10,9 @@
 # Important: Cannot use "default" namespace - must be dedicated
 namespace: ""
 
-# Operator subscription configuration
-operator:
-  # Install operator (OperatorGroup + Subscription)
-  # Set to false if operator is already installed by cluster admin
-  # When false, only AAP instance CR is deployed
-  install: true
-
-  # Operator channel - stable-2.7 for AAP 2.7
-  channel: "stable-2.7"
-
-  # Starting CSV for initial installation
-  # Leave empty to install latest from channel
-  # Set explicitly to avoid OLM upgrade path issues
-  startingCSV: "aap-operator.v2.7.0-0.1781768237"
-
-  # Install plan approval mode
-  # Automatic: operator upgrades applied automatically
-  # Manual: require manual approval for upgrades
-  installPlanApproval: "Automatic"
-
-  # Operator source
-  source: "redhat-operators"
-  sourceNamespace: "openshift-marketplace"
+# NOTE: This chart assumes AAP 2.7 operator is already installed cluster-scoped.
+# Operator installation requires cluster-admin permissions not available in
+# namespace-restricted environments (CNV/Babylon sandboxes).
 
 # =============================================================================
 # AAP Instance Configuration

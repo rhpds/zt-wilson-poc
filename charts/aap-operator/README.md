@@ -1,20 +1,21 @@
-# AAP Operator Helm Chart
+# AAP Instance Helm Chart
 
-Helm chart for deploying Ansible Automation Platform 2.7 Operator on OpenShift Container Platform.
+Helm chart for deploying Ansible Automation Platform 2.7 instances on OpenShift Container Platform.
 
 ## Overview
 
 This chart deploys:
-1. **OperatorGroup** - Scopes operator to target namespace
-2. **Subscription** - Installs AAP 2.7 operator from Red Hat catalog
-3. **Secret** - Admin password (if not using existing secret)
-4. **AnsibleAutomationPlatform CR** - Creates configured AAP instance
+1. **Secret** - Admin password (if not using existing secret)
+2. **AnsibleAutomationPlatform CR** - Creates configured AAP instance
+
+**Note:** This chart assumes the AAP 2.7 operator is already installed cluster-scoped by a cluster administrator.
 
 ## Prerequisites
 
 - OpenShift Container Platform 4.12+ (see [AAP Life Cycle](https://access.redhat.com/support/policy/updates/ansible-automation-platform))
+- **AAP 2.7 cluster-scoped operator pre-installed** (requires cluster-admin)
 - Valid Red Hat Ansible Automation Platform subscription
-- Cluster admin or namespace admin permissions
+- Namespace admin permissions for target namespace
 - Helm 3.10+ (for rendering templates)
 
 ## Quick Start

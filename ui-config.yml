@@ -11,7 +11,7 @@ antora:
 tabs:
   - name: "AAP Web UI"
     url: https://aap-sandbox-${guid}-zt-rhelbu.apps.ocpvdev01.dal13.infra.demo.redhat.com/
-    external: true
+    external: false
   # Future: Foreman Web UI tab (placeholder from template)
   # - name: "Foreman Web UI"
   #   url: https://foreman-${guid}.${domain}/

@@ -8,7 +8,8 @@ To ensure AAP route hostname matches Showroom's `${domain}` variable:
 
 ```yaml
 # values.yaml or --set flag
-route_host: "aap-sandbox-<guid>-zt-rhelbu.apps.ocpvdev01.rhdp.net"
+# Pattern: aap-${guid}.${domain}
+route_host: "aap-<guid>.apps.ocpvdev01.rhdp.net"
 ```
 
 ### Example for ocpvdev01 cluster
@@ -16,7 +17,7 @@ route_host: "aap-sandbox-<guid>-zt-rhelbu.apps.ocpvdev01.rhdp.net"
 ```bash
 helm template aap charts/aap-operator/ \
   --set admin.password=redhat123 \
-  --set route_host="aap-sandbox-qppv2-zt-rhelbu.apps.ocpvdev01.rhdp.net" \
+  --set route_host="aap-qppv2.apps.ocpvdev01.rhdp.net" \
   | oc apply -f -
 ```
 
@@ -40,4 +41,4 @@ tabs:
     external: false
 ```
 
-**Tradeoff**: Less portable across clusters but works without AAP chart changes.
+**Note**: This fallback approach uses the operator's default domain, which may differ from Showroom's `${domain}`.

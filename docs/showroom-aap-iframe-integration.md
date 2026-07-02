@@ -115,7 +115,7 @@ Configure the AAP Web UI tab with the correct URL and iframe settings.
 ```yaml
 tabs:
   - name: "AAP Web UI"
-    url: https://aap-sandbox-${guid}-zt-rhelbu.apps.ocpvdev01.dal13.infra.demo.redhat.com/
+    url: https://aap-${guid}.${domain}/
     external: false
 ```
 
@@ -123,20 +123,20 @@ tabs:
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| `url` | Full HTTPS route hostname | Browsers cannot resolve internal `.svc` URLs |
+| `url` | `https://aap-${guid}.${domain}/` | Uses Showroom's domain variable for portability |
 | `external` | `false` | Embeds as iframe (not new tab) |
 | `${guid}` | Variable substitution | Replaced by `envsubst` during Showroom pod startup |
+| `${domain}` | Variable substitution | Cluster route domain (e.g., `apps.ocpvdev01.rhdp.net`) |
 
-**Domain mismatch issue**: The `${domain}` variable in Showroom expands to `apps.ocpvdev01.rhdp.net` but AAP operator defaults to the cluster's route domain (`apps.ocpvdev01.dal13.infra.demo.redhat.com`). 
+**URL Pattern**: Simplified to `aap-${guid}.${domain}` (removed `-sandbox-` and `-zt-rhelbu` for cleaner URLs).
 
-**Solution**: Set `route_host` in AAP chart to match Showroom's domain:
+**Domain alignment**: Set `route_host` in AAP chart to match this pattern:
 
 ```yaml
 # charts/aap-operator/values.yaml or --set flag
-route_host: "aap-sandbox-${guid}-zt-rhelbu.apps.ocpvdev01.rhdp.net"
+# Pattern: aap-${guid}.${domain}
+route_host: "aap-qppv2.apps.ocpvdev01.rhdp.net"
 ```
-
-**Alternative**: Hardcode the full hostname in ui-config.yml if you cannot control AAP deployment.
 
 ---
 
@@ -158,7 +158,7 @@ showroom:
 ```bash
 helm template aap charts/aap-operator/ \
   --set admin.password=<password> \
-  --set route_host="aap-sandbox-<guid>-zt-rhelbu.apps.ocpvdev01.rhdp.net" \
+  --set route_host="aap-<guid>.apps.ocpvdev01.rhdp.net" \
   | oc apply -f -
 ```
 
